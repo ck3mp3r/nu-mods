@@ -1,5 +1,5 @@
 # Create a new git branch with an AI-generated name based on current changes or user input
-export def 'ai git create branch' [
+export def 'git-branch' [
   --model (-m): string = "gpt-4.1" # AI model to use for branch name generation
   --description (-d): string # Optional description of what you're working on
   --prefix (-p): string # Optional prefix for branch name (e.g., ABC-123)
@@ -61,11 +61,7 @@ export def 'ai git create branch' [
       create_git_branch $branch_name $base_branch
     }
     "r" => {
-      if $from_current {
-        ai git create branch --model $model --description $description --prefix $prefix --from-current
-      } else {
-        ai git create branch --model $model --description $description --prefix $prefix
-      }
+      print "Retry by running the command again"
     }
     "e" => {
       let edited_name = (input "Enter branch name: ")
@@ -85,7 +81,7 @@ export def 'ai git create branch' [
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
-export def 'ai git create pr' [
+export def 'git-pr' [
   --model (-m): string = "gpt-4.1" # AI model to use for PR generation
   --prefix (-p): string # Optional prefix for PR title (e.g., ABC-123)
   --target (-t): string = "main" # Target branch for the PR
@@ -146,7 +142,7 @@ export def 'ai git create pr' [
       create_github_pr $title $description $target
     }
     "r" => {
-      ai git create pr --model $model --prefix $prefix --target $target
+      print "Retry by running the command again"
     }
     "e" => {
       let edited_title = (input $"Edit title [($title)]: ")
@@ -158,8 +154,8 @@ export def 'ai git create pr' [
       let choice2 = (input -n 1 -d a "Enter your choice: ")
       match $choice2 {
         "c" => { create_github_pr $final_title $description $target }
-        "r" => { ai git create pr --model $model --prefix $prefix --target $target }
-        "e" => { ai git create pr --model $model --prefix $prefix --target $target } # Start over with editing
+        "r" => { print "Retry by running the command again" }
+        "e" => { print "Retry by running the command again" }
         "a" => { print "Operation aborted." }
         _ => { print "Invalid choice. Operation aborted." }
       }
@@ -175,7 +171,7 @@ export def 'ai git create pr' [
 }
 
 # Generate and apply an AI-written commit message based on staged changes
-export def 'ai git commit' [
+export def 'git-commit' [
   --model (-m): string = "gpt-4.1" # AI model to use for commit message generation
 ] {
   let branch = (git rev-parse --abbrev-ref HEAD | str trim)
@@ -211,7 +207,7 @@ export def 'ai git commit' [
       commit_with_message $message
     }
     "r" => {
-      ai git commit --model $model
+      print "Retry by running the command again"
     }
     "a" => {
       print "Operation aborted."
@@ -380,8 +376,4 @@ def create_github_pr [title: string description: string target: string] {
   } else {
     print $"❌ Failed to create PR: ($result.stderr)"
   }
-}
-
-export def 'ai git' [] {
-  help ai git
 }

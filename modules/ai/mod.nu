@@ -1,5 +1,5 @@
 export use git.nu *
 
-export def 'ai' [] {
+export def main [] {
   help ai
 }
