@@ -2,6 +2,8 @@
 export def 'ai git create branch' [
   --model (-m): string = "gpt-4.1" # AI model to use for branch name generation
   --description (-d): string # Optional description of what you're working on
+  --prefix (-p): string # Optional prefix for branch name (e.g., ABC-123)
+  --from-current # Branch from current branch instead of main
 ] {
   # Check if we're in a git repository
   let git_status = (git status --porcelain 2>/dev/null | complete)
@@ -15,9 +17,12 @@ export def 'ai git create branch' [
   let unstaged_diff = (git diff --name-only | str trim)
   let untracked_files = (git ls-files --others --exclude-standard | str trim)
 
-  # Get current branch for prefix extraction
-  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
-  let prefix = ($current_branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
+  # Determine base branch
+  let base_branch = if $from_current {
+    git rev-parse --abbrev-ref HEAD | str trim
+  } else {
+    "main"
+  }
 
   # Build context for AI
   mut context = ""
@@ -41,7 +46,7 @@ export def 'ai git create branch' [
     $context = "No specific changes detected. General development branch."
   }
 
-  let prompt = make_branch_prompt $context $prefix
+  let prompt = make_branch_prompt $context ($prefix | default "")
 
   print "Generating branch name..."
 
@@ -53,15 +58,19 @@ export def 'ai git create branch' [
 
   match $choice {
     "c" => {
-      create_git_branch $branch_name
+      create_git_branch $branch_name $base_branch
     }
     "r" => {
-      ai git create branch --model $model --description $description
+      if $from_current {
+        ai git create branch --model $model --description $description --prefix $prefix --from-current
+      } else {
+        ai git create branch --model $model --description $description --prefix $prefix
+      }
     }
     "e" => {
       let edited_name = (input "Enter branch name: ")
       if $edited_name != "" {
-        create_git_branch $edited_name
+        create_git_branch $edited_name $base_branch
       } else {
         print "Operation aborted."
       }
@@ -183,8 +192,12 @@ Context: ($context)"
 
   if $prefix != "" {
     $prompt_text = $"($prompt_text)
-IMPORTANT: The branch name MUST start with '($prefix)/' (including the slash).
-Example format: ($prefix)/your-branch-name"
+IMPORTANT: The branch name MUST start with '($prefix)/' followed by a conventional prefix.
+Example formats: 
+- ($prefix)/feature/user-authentication
+- ($prefix)/fix/login-bug  
+- ($prefix)/docs/api-updates
+- ($prefix)/refactor/cleanup-code"
   } else {
     $prompt_text = $"($prompt_text)
 Use appropriate prefixes like:
@@ -200,13 +213,22 @@ Return ONLY the branch name, no additional text or explanation."
   $prompt_text
 }
 
-def create_git_branch [branch_name: string] {
-  print $"Creating branch: ($branch_name)"
+def create_git_branch [branch_name: string base_branch: string] {
+  print $"Creating branch: ($branch_name) from ($base_branch)"
+
+  # First checkout the base branch if not already on it
+  if $base_branch != "main" or (git rev-parse --abbrev-ref HEAD | str trim) != $base_branch {
+    let checkout_result = (git checkout $base_branch | complete)
+    if $checkout_result.exit_code != 0 {
+      print $"❌ Failed to checkout base branch ($base_branch): ($checkout_result.stderr)"
+      return
+    }
+  }
 
   let result = (git checkout -b $branch_name | complete)
 
   if $result.exit_code == 0 {
-    print $"✅ Successfully created and switched to branch: ($branch_name)"
+    print $"✅ Successfully created and switched to branch: ($branch_name) from ($base_branch)"
   } else {
     print $"❌ Failed to create branch: ($result.stderr)"
   }
