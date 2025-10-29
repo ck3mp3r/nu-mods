@@ -85,7 +85,94 @@ export def 'ai git create branch' [
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
-export def 'ai git create pr' [] { }
+export def 'ai git create pr' [
+  --model (-m): string = "gpt-4.1" # AI model to use for PR generation
+  --prefix (-p): string # Optional prefix for PR title (e.g., ABC-123)
+  --target (-t): string = "main" # Target branch for the PR
+] {
+  # Check if we're in a git repository
+  let git_status = (git status --porcelain 2>/dev/null | complete)
+  if $git_status.exit_code != 0 {
+    print "Error: Not in a git repository"
+    return
+  }
+
+  # Get current branch
+  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  if $current_branch == $target {
+    print $"Error: Cannot create PR from ($target) to ($target)"
+    return
+  }
+
+  # Get changes between current branch and target
+  let diff = (git diff $"($target)...HEAD" | str trim)
+  let commit_messages = (git log $"($target)..HEAD" --oneline | str trim)
+  let changed_files = (git diff $"($target)...HEAD" --name-only | str trim)
+
+  if $diff == "" {
+    print $"No changes found between ($current_branch) and ($target)"
+    return
+  }
+
+  # Build context for AI
+  let context = {
+    branch: $current_branch
+    target: $target
+    commits: $commit_messages
+    files: $changed_files
+    diff: $diff
+  }
+
+  let pr_content = make_pr_prompt $context ($prefix | default "")
+
+  print "Generating PR title and description..."
+
+  let generated = (mods --model $model --quiet --raw --no-cache $pr_content | str trim)
+  let generated_clean = ($generated | split row "</think>" | last | str trim)
+
+  # Parse title and description from generated content
+  let lines = ($generated_clean | lines)
+  let title = ($lines | first)
+  let description = ($lines | skip 1 | str join "\n" | str trim)
+
+  print $"\nGenerated PR:\n"
+  print $"Title: ($title)"
+  print $"Description:\n($description)\n"
+  print "Choose an action: [c]reate, [r]etry, [e]dit title, [a]bort\n"
+  let choice = (input -n 1 -d a "Enter your choice: ")
+
+  match $choice {
+    "c" => {
+      create_github_pr $title $description $target
+    }
+    "r" => {
+      ai git create pr --model $model --prefix $prefix --target $target
+    }
+    "e" => {
+      let edited_title = (input $"Edit title [($title)]: ")
+      let final_title = if $edited_title != "" { $edited_title } else { $title }
+      print $"\nUpdated PR:\n"
+      print $"Title: ($final_title)"
+      print $"Description:\n($description)\n"
+      print "Choose an action: [c]reate, [r]etry, [e]dit title, [a]bort\n"
+      let choice2 = (input -n 1 -d a "Enter your choice: ")
+      match $choice2 {
+        "c" => { create_github_pr $final_title $description $target }
+        "r" => { ai git create pr --model $model --prefix $prefix --target $target }
+        "e" => { ai git create pr --model $model --prefix $prefix --target $target } # Start over with editing
+        "a" => { print "Operation aborted." }
+        _ => { print "Invalid choice. Operation aborted." }
+      }
+    }
+
+    "a" => {
+      print "Operation aborted."
+    }
+    _ => {
+      print "Invalid choice. Operation aborted."
+    }
+  }
+}
 
 # Generate and apply an AI-written commit message based on staged changes
 export def 'ai git commit' [
@@ -231,6 +318,67 @@ def create_git_branch [branch_name: string base_branch: string] {
     print $"✅ Successfully created and switched to branch: ($branch_name) from ($base_branch)"
   } else {
     print $"❌ Failed to create branch: ($result.stderr)"
+  }
+}
+
+def make_pr_prompt [context: record prefix: string] {
+  mut prompt_text = $"
+You are an expert in creating high-quality GitHub Pull Request titles and descriptions.
+
+Generate a concise PR title and detailed description based on the changes provided.
+
+PR Title Guidelines:
+1. Be clear and descriptive \(under 60 characters\)
+2. Use imperative mood \(Add, Fix, Update, Remove, etc.\)
+3. Focus on the main change or feature"
+
+  if $prefix != "" {
+    $prompt_text = $"($prompt_text)4. MUST start with '($prefix): ' \(note the colon and space\)
+Example: ($prefix): Add user authentication system"
+  } else {
+    $prompt_text = $"($prompt_text)4. Use conventional prefixes like 'feat:', 'fix:', 'docs:', etc."
+  }
+
+  $prompt_text = $"($prompt_text)
+
+PR Description Guidelines:
+1. Start with a succinct 1-2 sentence summary
+2. Add a blank line
+3. Follow with detailed information at the bottom
+
+Branch: ($context.branch) → ($context.target)
+Recent commits:($context.commits)
+
+Changed files:($context.files)
+
+Output Format:
+Title line here
+Brief succinct summary of what this PR accomplishes in 1-2 sentences.
+
+## Details
+- Specific implementation details
+- Technical changes made
+- Files modified and why
+- Any architectural decisions
+
+## Context
+Additional background information, motivation, or considerations if relevant.
+
+Changes diff:($context.diff)"
+
+  $prompt_text
+}
+
+def create_github_pr [title: string description: string target: string] {
+  print $"Creating PR: ($title)"
+  print $"Target branch: ($target)"
+
+  let result = (gh pr create --title $title --body $description --base $target | complete)
+
+  if $result.exit_code == 0 {
+    print $"✅ Successfully created PR: ($result.stdout)"
+  } else {
+    print $"❌ Failed to create PR: ($result.stderr)"
   }
 }
 
