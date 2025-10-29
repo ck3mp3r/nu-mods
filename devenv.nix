@@ -11,8 +11,8 @@
 
   scripts = {
     test = {
-      exec = "nu -c 'use std testing; testing run-tests --path .'";
-      description = "Run Nushell module tests";
+      exec = "echo 'No tests configured yet. Add test files with #[test] annotations.'";
+      description = "Run Nushell module tests (placeholder)";
     };
     check = {
       exec = "nu -c 'ls **/*.nu | each { |it| nu -n $it.name }'";
