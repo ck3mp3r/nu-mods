@@ -23,11 +23,52 @@
       perSystem = {system, ...}: let
         pkgs = import inputs.nixpkgs {inherit system;};
       in {
-        packages = {
+        packages = let
+          # Helper function to create individual module packages
+          mkNuModule = {
+            pname,
+            src,
+            description,
+          }:
+            pkgs.stdenvNoCC.mkDerivation {
+              inherit pname src;
+              version = "0.1.0";
+
+              dontBuild = true;
+              dontConfigure = true;
+
+              installPhase = ''
+                runHook preInstall
+
+                mkdir -p $out/share/nushell/modules/${pname}
+                cp -r * $out/share/nushell/modules/${pname}/
+
+                runHook postInstall
+              '';
+
+              meta = with pkgs.lib; {
+                inherit description;
+                license = licenses.mit;
+                platforms = platforms.all;
+              };
+            };
+        in {
+          # Individual module packages
+          ai = mkNuModule {
+            pname = "ai";
+            src = ./modules/ai;
+            description = "AI-powered git operations for Nushell";
+          };
+
+          # Global package that bundles all modules
           default = pkgs.stdenvNoCC.mkDerivation {
             pname = "nu-mods";
             version = "0.1.0";
             src = ./.;
+
+            buildInputs = [
+              self.packages.${system}.ai
+            ];
 
             dontBuild = true;
             dontConfigure = true;
@@ -36,7 +77,18 @@
               runHook preInstall
 
               mkdir -p $out/share/nushell/modules
-              cp -r * $out/share/nushell/modules/
+
+              # Copy individual modules from their packages
+              ${pkgs.lib.concatMapStringsSep "\n" (pkg: ''
+                  if [ -d "${pkg}/share/nushell/modules" ]; then
+                    cp -r "${pkg}"/share/nushell/modules/* $out/share/nushell/modules/
+                  fi
+                '') [
+                  self.packages.${system}.ai
+                ]}
+
+              # Copy any additional files (README, etc.)
+              cp README.md $out/share/nushell/ 2>/dev/null || true
 
               runHook postInstall
             '';
@@ -64,6 +116,7 @@
       flake = {
         overlays.default = final: prev: {
           nu-mods = self.packages.${prev.system}.default;
+          nu-mods-ai = self.packages.${prev.system}.ai;
         };
       };
     };
