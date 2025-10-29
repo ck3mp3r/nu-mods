@@ -15,7 +15,7 @@
       description = "Run Nushell module tests";
     };
     check = {
-      exec = "nu -c 'ls **/*.nu | each { |it| nu --check $it.name }'";
+      exec = "nu -c 'ls **/*.nu | each { |it| nu -n $it.name }'";
       description = "Check Nushell syntax for all .nu files";
     };
     fmt = {
@@ -29,7 +29,7 @@
     nu-syntax-check = {
       enable = true;
       name = "Check Nushell syntax";
-      entry = "nu -c 'ls **/*.nu | each { |it| nu --check $it.name }'";
+      entry = "nu -c 'ls **/*.nu | each { |it| nu -n $it.name }'";
       language = "system";
       files = "\\.nu$";
       pass_filenames = false;
