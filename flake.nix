@@ -24,11 +24,12 @@
         pkgs = import inputs.nixpkgs {inherit system;};
       in {
         packages = let
-          # Helper function to create individual module packages
+          # Helper function to create individual module packages with dependencies
           mkNuModule = {
             pname,
             src,
             description,
+            dependencies ? [],
           }:
             pkgs.stdenvNoCC.mkDerivation {
               inherit pname src;
@@ -43,6 +44,13 @@
                 mkdir -p $out/share/nushell/modules/${pname}
                 cp -r * $out/share/nushell/modules/${pname}/
 
+                # Copy dependencies at the same level (as sibling modules)
+                ${pkgs.lib.concatMapStringsSep "\n" (dep: ''
+                  if [ -d "${dep}/share/nushell/modules" ]; then
+                    cp -r "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
+                  fi
+                '') dependencies}
+
                 runHook postInstall
               '';
 
@@ -53,11 +61,19 @@
               };
             };
         in {
-          # Individual module packages
+          # Standard library modules (no dependencies)
+          std = mkNuModule {
+            pname = "std";
+            src = ./modules/std;
+            description = "Standard library utilities for Nushell modules";
+          };
+
+          # Individual module packages (with dependencies)
           ai = mkNuModule {
             pname = "ai";
             src = ./modules/ai;
             description = "AI-powered git operations for Nushell";
+            dependencies = [self.packages.${system}.std];
           };
 
           # Global package that bundles all modules
@@ -67,6 +83,7 @@
             src = ./.;
 
             buildInputs = [
+              self.packages.${system}.std
               self.packages.${system}.ai
             ];
 
@@ -79,11 +96,13 @@
               mkdir -p $out/share/nushell/modules
 
               # Copy individual modules from their packages
+              # Note: Dependencies are already included in each package
               ${pkgs.lib.concatMapStringsSep "\n" (pkg: ''
                   if [ -d "${pkg}/share/nushell/modules" ]; then
                     cp -r "${pkg}"/share/nushell/modules/* $out/share/nushell/modules/
                   fi
                 '') [
+                  self.packages.${system}.std
                   self.packages.${system}.ai
                 ]}
 
@@ -116,6 +135,7 @@
       flake = {
         overlays.default = final: prev: {
           nu-mods = self.packages.${prev.system}.default;
+          nu-mods-std = self.packages.${prev.system}.std;
           nu-mods-ai = self.packages.${prev.system}.ai;
         };
       };
