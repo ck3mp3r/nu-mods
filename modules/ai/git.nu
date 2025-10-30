@@ -100,6 +100,20 @@ export def 'git-pr' [
     return
   }
 
+  # Check for existing PR first
+  print $"Checking for existing PRs for branch '($current_branch)' -> '($target)'..."
+  let existing_pr = (gh pr list --head $current_branch --base $target --json number,title | complete)
+
+  if $existing_pr.exit_code == 0 and ($existing_pr.stdout | str trim) != "[]" {
+    let pr_data = ($existing_pr.stdout | from json | first)
+    let pr_number = $pr_data.number
+    print $"✓ Found existing PR #($pr_number): ($pr_data.title)"
+    print $"→ Will update this PR with new content\n"
+  } else {
+    print "✓ No existing PR found"
+    print $"→ Will create new PR\n"
+  }
+
   # Get changes between current branch and target
   let diff = (git diff $"($target)...HEAD" | str trim)
   let commit_messages = (git log $"($target)..HEAD" --oneline | str trim)
@@ -139,7 +153,7 @@ export def 'git-pr' [
 
   match $choice {
     "c" => {
-      create_github_pr $title $description $target
+      create_or_update_github_pr $title $description $target
     }
     "r" => {
       print "Retry by running the command again"
@@ -153,7 +167,7 @@ export def 'git-pr' [
       print "Choose an action: [c]reate, [r]etry, [e]dit title, [a]bort\n"
       let choice2 = (input -n 1 -d a "Enter your choice: ")
       match $choice2 {
-        "c" => { create_github_pr $final_title $description $target }
+        "c" => { create_or_update_github_pr $final_title $description $target }
         "r" => { print "Retry by running the command again" }
         "e" => { print "Retry by running the command again" }
         "a" => { print "Operation aborted." }
@@ -365,15 +379,34 @@ Changes diff:($context.diff)"
   $prompt_text
 }
 
-def create_github_pr [title: string description: string target: string] {
-  print $"Creating PR: ($title)"
-  print $"Target branch: ($target)"
+def create_or_update_github_pr [title: string description: string target: string] {
+  # Check if PR already exists for current branch
+  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  let existing_pr = (gh pr list --head $current_branch --base $target --json number,title | complete)
 
-  let result = (gh pr create --title $title --body $description --base $target | complete)
+  if $existing_pr.exit_code == 0 and ($existing_pr.stdout | str trim) != "[]" {
+    let pr_data = ($existing_pr.stdout | from json | first)
+    let pr_number = $pr_data.number
 
-  if $result.exit_code == 0 {
-    print $"✅ Successfully created PR: ($result.stdout)"
+    print $"Updating PR #($pr_number)..."
+
+    let update_result = (gh pr edit $pr_number --title $title --body $description | complete)
+
+    if $update_result.exit_code == 0 {
+      print $"✅ Successfully updated PR #($pr_number)"
+      gh pr view $pr_number --web
+    } else {
+      print $"❌ Failed to update PR: ($update_result.stderr)"
+    }
   } else {
-    print $"❌ Failed to create PR: ($result.stderr)"
+    print $"Creating new PR..."
+
+    let result = (gh pr create --title $title --body $description --base $target | complete)
+
+    if $result.exit_code == 0 {
+      print $"✅ Successfully created PR: ($result.stdout)"
+    } else {
+      print $"❌ Failed to create PR: ($result.stderr)"
+    }
   }
 }
