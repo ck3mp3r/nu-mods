@@ -1,7 +1,7 @@
 # Helper function to show help with subcommands
 export def show-help [module_name: string] {
   # First show the normal help output
-  help $module_name
+  print (help $module_name)
 
   # Then add subcommands if any
   let commands = (scope commands | where name =~ $"^($module_name)" | select name description)
