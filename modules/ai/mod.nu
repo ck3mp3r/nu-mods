@@ -1,4 +1,4 @@
-use std.nu show-help
+use ../std/help show-help
 
 export def main [] {
   show-help "ai"
@@ -6,7 +6,7 @@ export def main [] {
 
 export module git {
   use ./git.nu *
-  use ./std.nu show-help
+  use ../std/help show-help
 
   export def main [] {
     show-help "ai git"
