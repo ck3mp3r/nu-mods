@@ -61,11 +61,11 @@
               };
             };
         in {
-          # Standard library modules (no dependencies)
-          std = mkNuModule {
-            pname = "std";
-            src = ./modules/std;
-            description = "Standard library utilities for Nushell modules";
+          # Common library modules (no dependencies)
+          common = mkNuModule {
+            pname = "common";
+            src = ./modules/common;
+            description = "Common library utilities for Nushell modules";
           };
 
           # Individual module packages (with dependencies)
@@ -73,7 +73,7 @@
             pname = "ai";
             src = ./modules/ai;
             description = "AI-powered git operations for Nushell";
-            dependencies = [self.packages.${system}.std];
+            dependencies = [self.packages.${system}.common];
           };
 
           # Global package that bundles all modules
@@ -83,7 +83,7 @@
             src = ./.;
 
             buildInputs = [
-              self.packages.${system}.std
+              self.packages.${system}.common
               self.packages.${system}.ai
             ];
 
@@ -102,7 +102,7 @@
                     cp -r "${pkg}"/share/nushell/modules/* $out/share/nushell/modules/
                   fi
                 '') [
-                  self.packages.${system}.std
+                  self.packages.${system}.common
                   self.packages.${system}.ai
                 ]}
 
@@ -135,7 +135,7 @@
       flake = {
         overlays.default = final: prev: {
           nu-mods = self.packages.${prev.system}.default;
-          nu-mods-std = self.packages.${prev.system}.std;
+          nu-mods-common = self.packages.${prev.system}.common;
           nu-mods-ai = self.packages.${prev.system}.ai;
         };
       };

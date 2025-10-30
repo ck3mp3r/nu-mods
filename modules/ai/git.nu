@@ -6,20 +6,20 @@ export def 'git-branch' [
   --from-current # Branch from current branch instead of main
 ] {
   # Check if we're in a git repository
-  let git_status = (git status --porcelain 2>/dev/null | complete)
+  let git_status = (^git status --porcelain 2>/dev/null | complete)
   if $git_status.exit_code != 0 {
     print "Error: Not in a git repository"
     return
   }
 
   # Get current changes for context
-  let staged_diff = (git diff --cached --name-only | str trim)
-  let unstaged_diff = (git diff --name-only | str trim)
-  let untracked_files = (git ls-files --others --exclude-standard | str trim)
+  let staged_diff = (^git diff --cached --name-only | str trim)
+  let unstaged_diff = (^git diff --name-only | str trim)
+  let untracked_files = (^git ls-files --others --exclude-standard | str trim)
 
   # Determine base branch
   let base_branch = if $from_current {
-    git rev-parse --abbrev-ref HEAD | str trim
+    ^git rev-parse --abbrev-ref HEAD | str trim
   } else {
     "main"
   }
@@ -87,14 +87,14 @@ export def 'git-pr' [
   --target (-t): string = "main" # Target branch for the PR
 ] {
   # Check if we're in a git repository
-  let git_status = (git status --porcelain 2>/dev/null | complete)
+  let git_status = (^git status --porcelain 2>/dev/null | complete)
   if $git_status.exit_code != 0 {
     print "Error: Not in a git repository"
     return
   }
 
   # Get current branch
-  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  let current_branch = (^git rev-parse --abbrev-ref HEAD | str trim)
   if $current_branch == $target {
     print $"Error: Cannot create PR from ($target) to ($target)"
     return
@@ -115,9 +115,9 @@ export def 'git-pr' [
   }
 
   # Get changes between current branch and target
-  let diff = (git diff $"($target)...HEAD" | str trim)
-  let commit_messages = (git log $"($target)..HEAD" --oneline | str trim)
-  let changed_files = (git diff $"($target)...HEAD" --name-only | str trim)
+  let diff = (^git diff $"($target)...HEAD" | str trim)
+  let commit_messages = (^git log $"($target)..HEAD" --oneline | str trim)
+  let changed_files = (^git diff $"($target)...HEAD" --name-only | str trim)
 
   if $diff == "" {
     print $"No changes found between ($current_branch) and ($target)"
@@ -188,9 +188,9 @@ export def 'git-pr' [
 export def 'git-commit' [
   --model (-m): string = "gpt-4.1" # AI model to use for commit message generation
 ] {
-  let branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
-  let diff = (git diff --cached | str trim)
+  let diff = (^git diff --cached | str trim)
 
   if $diff == "" {
     print "No changes staged!"
@@ -269,7 +269,7 @@ def commit_with_message [message: string] {
   $message | save -f $commit_msg_file
 
   $env.GIT_EDITOR = ($env.EDITOR? | default "vim")
-  git commit --edit --file $commit_msg_file
+  ^git commit --edit --file $commit_msg_file
 
   rm $commit_msg_file
 }
@@ -314,15 +314,15 @@ def create_git_branch [branch_name: string base_branch: string] {
   print $"Creating branch: ($branch_name) from ($base_branch)"
 
   # First checkout the base branch if not already on it
-  if $base_branch != "main" or (git rev-parse --abbrev-ref HEAD | str trim) != $base_branch {
-    let checkout_result = (git checkout $base_branch | complete)
+  if $base_branch != "main" or (^git rev-parse --abbrev-ref HEAD | str trim) != $base_branch {
+    let checkout_result = (^git checkout $base_branch | complete)
     if $checkout_result.exit_code != 0 {
       print $"❌ Failed to checkout base branch ($base_branch): ($checkout_result.stderr)"
       return
     }
   }
 
-  let result = (git checkout -b $branch_name | complete)
+  let result = (^git checkout -b $branch_name | complete)
 
   if $result.exit_code == 0 {
     print $"✅ Successfully created and switched to branch: ($branch_name) from ($base_branch)"
@@ -381,7 +381,7 @@ Changes diff:($context.diff)"
 
 def create_or_update_github_pr [title: string description: string target: string] {
   # Check if PR already exists for current branch
-  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  let current_branch = (^git rev-parse --abbrev-ref HEAD | str trim)
   let existing_pr = (gh pr list --head $current_branch --base $target --json number,title | complete)
 
   if $existing_pr.exit_code == 0 and ($existing_pr.stdout | str trim) != "[]" {
