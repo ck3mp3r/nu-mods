@@ -1,9 +1,11 @@
 use ../std/help show-help
 
+# AI-powered utilities for git operations
 export def main [] {
   show-help "ai"
 }
 
+# AI-powered git commands for branch names, commits, and pull requests
 export module git {
   use ./git.nu *
   use ../std/help show-help
