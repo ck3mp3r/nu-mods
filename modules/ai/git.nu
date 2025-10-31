@@ -98,7 +98,11 @@ def 'git-branch' [
       create_git_branch $branch_name $base_branch
     }
     "r" => {
-      print "Retry by running the command again"
+      if $from_current {
+        git-branch --model $model --description $description --prefix $prefix --from-current
+      } else {
+        git-branch --model $model --description $description --prefix $prefix
+      }
     }
     "e" => {
       let edited_name = (input "Enter branch name: ")
@@ -193,7 +197,7 @@ def 'git-pr' [
       create_or_update_github_pr $title $description $target
     }
     "r" => {
-      print "Retry by running the command again"
+      git-pr --model $model --prefix $prefix --target $target
     }
     "e" => {
       let edited_title = (input $"Edit title [($title)]: ")
@@ -205,8 +209,8 @@ def 'git-pr' [
       let choice2 = (input -n 1 -d a "Enter your choice: ")
       match $choice2 {
         "c" => { create_or_update_github_pr $final_title $description $target }
-        "r" => { print "Retry by running the command again" }
-        "e" => { print "Retry by running the command again" }
+        "r" => { git-pr --model $model --prefix $prefix --target $target }
+        "e" => { git-pr --model $model --prefix $prefix --target $target }
         "a" => { print "Operation aborted." }
         _ => { print "Invalid choice. Operation aborted." }
       }
@@ -258,7 +262,7 @@ def 'git-commit' [
       commit_with_message $message
     }
     "r" => {
-      print "Retry by running the command again"
+      git-commit --model $model
     }
     "a" => {
       print "Operation aborted."
