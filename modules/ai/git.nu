@@ -431,7 +431,17 @@ def create_or_update_github_pr [title: string description: string target: string
 
     print $"Updating PR #($pr_number)..."
 
-    let update_result = (gh pr edit $pr_number --title $title --body $description | complete)
+    let repo_result = (gh repo view --json owner,name | complete)
+    if $repo_result.exit_code != 0 {
+      print $"❌ Failed to get repo info: ($repo_result.stderr)"
+      return
+    }
+
+    let repo = ($repo_result.stdout | from json)
+    let owner = $repo.owner.login
+    let name = $repo.name
+
+    let update_result = (gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f title=$title -f body=$description | complete)
 
     if $update_result.exit_code == 0 {
       print $"✅ Successfully updated PR #($pr_number)"
