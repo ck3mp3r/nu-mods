@@ -1,5 +1,42 @@
+use ../common/help show-help
+
+# AI-powered git commands - show help
+export def "ai git" [] {
+  show-help "ai git"
+}
+
 # Create a new git branch with an AI-generated name based on current changes or user input
-export def 'git-branch' [
+export def "ai git branch" [
+  --model (-m): string = "gpt-4.1"
+  --description (-d): string
+  --prefix (-p): string
+  --from-current
+] {
+  if $from_current {
+    git-branch --model $model --description $description --prefix $prefix --from-current
+  } else {
+    git-branch --model $model --description $description --prefix $prefix
+  }
+}
+
+# Create a pull request with AI-generated title and description based on branch changes
+export def "ai git pr" [
+  --model (-m): string = "gpt-4.1"
+  --prefix (-p): string
+  --target (-t): string = "main"
+] {
+  git-pr --model $model --prefix $prefix --target $target
+}
+
+# Generate and apply an AI-written commit message based on staged changes
+export def "ai git commit" [
+  --model (-m): string = "gpt-4.1"
+] {
+  git-commit --model $model
+}
+
+# Create a new git branch with an AI-generated name based on current changes or user input
+def 'git-branch' [
   --model (-m): string = "gpt-4.1" # AI model to use for branch name generation
   --description (-d): string # Optional description of what you're working on
   --prefix (-p): string # Optional prefix for branch name (e.g., ABC-123)
@@ -81,7 +118,7 @@ export def 'git-branch' [
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
-export def 'git-pr' [
+def 'git-pr' [
   --model (-m): string = "gpt-4.1" # AI model to use for PR generation
   --prefix (-p): string # Optional prefix for PR title (e.g., ABC-123)
   --target (-t): string = "main" # Target branch for the PR
@@ -185,7 +222,7 @@ export def 'git-pr' [
 }
 
 # Generate and apply an AI-written commit message based on staged changes
-export def 'git-commit' [
+def 'git-commit' [
   --model (-m): string = "gpt-4.1" # AI model to use for commit message generation
 ] {
   let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
