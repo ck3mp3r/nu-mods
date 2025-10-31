@@ -441,7 +441,7 @@ def create_or_update_github_pr [title: string description: string target: string
     let owner = $repo.owner.login
     let name = $repo.name
 
-    let update_result = (gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f title=$title -f body=$description | complete)
+    let update_result = (gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($description)" | complete)
 
     if $update_result.exit_code == 0 {
       print $"✅ Successfully updated PR #($pr_number)"
