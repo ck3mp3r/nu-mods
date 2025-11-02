@@ -1,0 +1,48 @@
+# Nix
+result
+result-*
+.direnv/
+
+# Direnv
+.direnv/
+
+# Devenv
+.devenv/
+.devenv.flake.nix
+devenv.local.nix
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+
+# Nushell history (if stored locally)
+.nu-history
+
+# pre-commit
+.pre-commit-config.yaml
