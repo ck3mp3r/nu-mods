@@ -252,17 +252,22 @@ def git-commit [
 
 def make_commit_prompt [diff: string] {
   $"
-Generate a commit message following Conventional Commits specification.
+You are an expert in writing Git commit messages following Conventional Commits specification.
 
-Requirements:
-- Title: imperative mood, 50 chars max, describes what changed
-- Body: bullet points for significant changes only
-- Use technical, precise language
-- Skip minor changes \(formatting, imports, trivial refactors\)
-- No redundant information between title and bullets
-- No generic descriptions
+Your task is to generate a commit message based on the provided diff. The commit message must:
+1. Use a clear, descriptive title in imperative mood \(50 characters max\)
+2. Include bullet points for significant changes only
+3. Use technical, precise language
+4. Skip minor changes \(formatting, imports, trivial refactors\)
+5. Avoid redundant information between title and bullets
 
-Output format:
+Important:
+- Return just the commit message, no additional text or explanation
+- Do not include labels like 'Title:' or 'Commit Message:'
+- Do not use markdown code blocks
+- Analyze the entire diff and capture only major changes
+
+Output Format:
 Concise title
 
 - Key change 1
@@ -341,33 +346,40 @@ def create_git_branch [branch_name: string base_branch: string] {
 
 def make_pr_prompt [context: record prefix: string] {
   mut prompt_text = $"
-Generate a PR title and description based on the changes below.
+You are an expert in creating GitHub Pull Request titles and descriptions.
 
-Title requirements:
-- Under 60 characters
-- Imperative mood \(Add, Fix, Update, etc.\)
-- Focus on the main change"
+Your task is to generate a PR title and description based on the changes provided.
+
+PR Title Guidelines:
+1. Be clear and descriptive \(under 60 characters\)
+2. Use imperative mood \(Add, Fix, Update, etc.\)
+3. Focus on the main change"
 
   if $prefix != "" {
     $prompt_text = $"($prompt_text)
-- Start with '($prefix): '"
+4. MUST start with '($prefix): '"
   } else {
     $prompt_text = $"($prompt_text)
-- Use conventional prefixes \(feat:, fix:, docs:, etc.\)"
+4. Use conventional prefixes like 'feat:', 'fix:', 'docs:', etc."
   }
 
   $prompt_text = $"($prompt_text)
 
-Description requirements:
-- 1-2 sentence summary of what changed
-- List key technical changes as bullet points
-- Focus on facts, not assumptions
+PR Description Guidelines:
+1. Start with a 1-2 sentence summary
+2. List key technical changes as bullet points
+3. Focus on facts, not assumptions
+
+Important:
+- Return just the PR content, no additional text or explanation
+- Do not include labels like 'Title:' or 'Description:'
+- Do not use markdown code blocks or headers
 
 Branch: ($context.branch) → ($context.target)
 Commits:($context.commits)
 Files:($context.files)
 
-Output format:
+Output Format:
 Title line
 Summary sentence.
 
