@@ -187,15 +187,7 @@ def git-pr [
       print $"\nUpdated PR:\n"
       print $"Title: ($final_title)"
       print $"Description:\n($description)\n"
-      print "Choose an action: [c]reate, [r]etry, [e]dit title, [a]bort\n"
-      let choice2 = (input -n 1 -d a "Enter your choice: ")
-      match $choice2 {
-        "c" => { create_or_update_github_pr $final_title $description $target }
-        "r" => { git-pr $model $prefix $target }
-        "e" => { git-pr $model $prefix $target }
-        "a" => { print "Operation aborted." }
-        _ => { print "Invalid choice. Operation aborted." }
-      }
+      create_or_update_github_pr $final_title $description $target
     }
 
     "a" => {
