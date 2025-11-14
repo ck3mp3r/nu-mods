@@ -12,11 +12,7 @@ export def "ai git branch" [
   --prefix (-p): string
   --from-current
 ] {
-  if $from_current {
-    git-branch --model $model --description $description --prefix $prefix --from-current
-  } else {
-    git-branch --model $model --description $description --prefix $prefix
-  }
+  git-branch $model ($description | default "") ($prefix | default "") $from_current
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
@@ -25,22 +21,22 @@ export def "ai git pr" [
   --prefix (-p): string
   --target (-t): string = "main"
 ] {
-  git-pr --model $model --prefix $prefix --target $target
+  git-pr $model ($prefix | default "") $target
 }
 
 # Generate and apply an AI-written commit message based on staged changes
 export def "ai git commit" [
   --model (-m): string = "gpt-4.1"
 ] {
-  git-commit --model $model
+  git-commit $model
 }
 
 # Create a new git branch with an AI-generated name based on current changes or user input
-def 'git-branch' [
-  --model (-m): string = "gpt-4.1" # AI model to use for branch name generation
-  --description (-d): string # Optional description of what you're working on
-  --prefix (-p): string # Optional prefix for branch name (e.g., ABC-123)
-  --from-current # Branch from current branch instead of main
+def git-branch [
+  model: string # AI model to use for branch name generation
+  description: string # Optional description of what you're working on
+  prefix: string # Optional prefix for branch name (e.g., ABC-123)
+  from_current: bool # Branch from current branch instead of main
 ] {
   # Check if we're in a git repository
   let git_status = (^git status --porcelain 2>/dev/null | complete)
@@ -51,8 +47,6 @@ def 'git-branch' [
 
   # Get current changes for context
   let staged_diff = (^git diff --cached --name-only | str trim)
-  let unstaged_diff = (^git diff --name-only | str trim)
-  let untracked_files = (^git ls-files --others --exclude-standard | str trim)
 
   # Determine base branch
   let base_branch = if $from_current {
@@ -63,7 +57,7 @@ def 'git-branch' [
 
   # Build context for AI
   mut context = ""
-  if $description != null {
+  if $description != "" {
     $context = $"Working on: ($description)\n"
   }
 
@@ -71,19 +65,11 @@ def 'git-branch' [
     $context = $"($context)Staged files: ($staged_diff)\n"
   }
 
-  if $unstaged_diff != "" {
-    $context = $"($context)Modified files: ($unstaged_diff)\n"
-  }
-
-  if $untracked_files != "" {
-    $context = $"($context)New files: ($untracked_files)\n"
-  }
-
   if $context == "" {
-    $context = "No specific changes detected. General development branch."
+    $context = "No staged changes detected. General development branch."
   }
 
-  let prompt = make_branch_prompt $context ($prefix | default "")
+  let prompt = make_branch_prompt $context $prefix
 
   print "Generating branch name..."
 
@@ -98,11 +84,7 @@ def 'git-branch' [
       create_git_branch $branch_name $base_branch
     }
     "r" => {
-      if $from_current {
-        git-branch --model $model --description $description --prefix $prefix --from-current
-      } else {
-        git-branch --model $model --description $description --prefix $prefix
-      }
+      git-branch $model $description $prefix $from_current
     }
     "e" => {
       let edited_name = (input "Enter branch name: ")
@@ -122,10 +104,10 @@ def 'git-branch' [
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
-def 'git-pr' [
-  --model (-m): string = "gpt-4.1" # AI model to use for PR generation
-  --prefix (-p): string # Optional prefix for PR title (e.g., ABC-123)
-  --target (-t): string = "main" # Target branch for the PR
+def git-pr [
+  model: string # AI model to use for PR generation
+  prefix: string # Optional prefix for PR title (e.g., ABC-123)
+  target: string # Target branch for the PR
 ] {
   # Check if we're in a git repository
   let git_status = (^git status --porcelain 2>/dev/null | complete)
@@ -174,7 +156,7 @@ def 'git-pr' [
     diff: $diff
   }
 
-  let pr_content = make_pr_prompt $context ($prefix | default "")
+  let pr_content = make_pr_prompt $context $prefix
 
   print "Generating PR title and description..."
 
@@ -197,22 +179,17 @@ def 'git-pr' [
       create_or_update_github_pr $title $description $target
     }
     "r" => {
-      git-pr --model $model --prefix $prefix --target $target
+      git-pr $model $prefix $target
     }
     "e" => {
-      let edited_title = (input $"Edit title [($title)]: ")
-      let final_title = if $edited_title != "" { $edited_title } else { $title }
-      print $"\nUpdated PR:\n"
-      print $"Title: ($final_title)"
-      print $"Description:\n($description)\n"
-      print "Choose an action: [c]reate, [r]etry, [e]dit title, [a]bort\n"
-      let choice2 = (input -n 1 -d a "Enter your choice: ")
-      match $choice2 {
-        "c" => { create_or_update_github_pr $final_title $description $target }
-        "r" => { git-pr --model $model --prefix $prefix --target $target }
-        "e" => { git-pr --model $model --prefix $prefix --target $target }
-        "a" => { print "Operation aborted." }
-        _ => { print "Invalid choice. Operation aborted." }
+      let edited_title = (input "Edit title: ")
+      if $edited_title != "" {
+        print $"\nUpdated PR:\n"
+        print $"Title: ($edited_title)"
+        print $"Description:\n($description)\n"
+        create_or_update_github_pr $edited_title $description $target
+      } else {
+        print "Operation aborted."
       }
     }
 
@@ -226,8 +203,8 @@ def 'git-pr' [
 }
 
 # Generate and apply an AI-written commit message based on staged changes
-def 'git-commit' [
-  --model (-m): string = "gpt-4.1" # AI model to use for commit message generation
+def git-commit [
+  model: string # AI model to use for commit message generation
 ] {
   let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
@@ -262,7 +239,7 @@ def 'git-commit' [
       commit_with_message $message
     }
     "r" => {
-      git-commit --model $model
+      git-commit $model
     }
     "a" => {
       print "Operation aborted."
@@ -275,31 +252,26 @@ def 'git-commit' [
 
 def make_commit_prompt [diff: string] {
   $"
-You are an expert in writing high-quality Git commit messages that strictly follow the [Conventional Commit]\(https://www.conventionalcommits.org/\) specification. You will be given a staged Git diff.
+You are an expert in writing Git commit messages following Conventional Commits specification.
 
-Your ONLY task is to generate a well-structured commit message based on the provided diff. The commit message must:
-1. Use a clear, descriptive title in the imperative mood \(50 characters max\)
-2. Provide a detailed explanation of changes in bullet points
-3. Focus solely on the technical changes in the code
-4. Don't focus on differences in markdown files
-5. Use present tense and be specific about modifications
+Your task is to generate a commit message based on the provided diff. The commit message must:
+1. Use a clear, descriptive title in imperative mood \(50 characters max\)
+2. Include bullet points for significant changes only
+3. Use technical, precise language
+4. Skip minor changes \(formatting, imports, trivial refactors\)
+5. Avoid redundant information between title and bullets
 
-Key Guidelines:
-- Don't use any git MCP functionality as the diff will be provided.
-- Analyze the entire diff comprehensively, consider added and removed code respectively
-- Capture the essence of only MAJOR changes
-- Use technical, precise languages
-- Avoid generic or vague descriptions
-- Avoid quoting any word or sentences
-- Avoid adding description for minor changes with not much context
-- Return just the commit message, no additional text
-- Don't return more bullet points than required
-- Generate a single commit message
+Important:
+- Return just the commit message, no additional text or explanation
+- Do not include labels like 'Title:' or 'Commit Message:'
+- Do not use markdown code blocks
+- Analyze the entire diff and capture only major changes
 
 Output Format:
-Concise Title Summarizing Changes
+Concise title
 
-- Specific change descriptions as bullet points
+- Key change 1
+- Key change 2
 
 Diff:($diff)"
 }
@@ -374,48 +346,47 @@ def create_git_branch [branch_name: string base_branch: string] {
 
 def make_pr_prompt [context: record prefix: string] {
   mut prompt_text = $"
-You are an expert in creating high-quality GitHub Pull Request titles and descriptions.
+You are an expert in creating GitHub Pull Request titles and descriptions.
 
-Generate a concise PR title and detailed description based on the changes provided.
+Your task is to generate a PR title and description based on the changes provided.
 
 PR Title Guidelines:
 1. Be clear and descriptive \(under 60 characters\)
-2. Use imperative mood \(Add, Fix, Update, Remove, etc.\)
-3. Focus on the main change or feature"
+2. Use imperative mood \(Add, Fix, Update, etc.\)
+3. Focus on the main change"
 
   if $prefix != "" {
-    $prompt_text = $"($prompt_text)4. MUST start with '($prefix): ' \(note the colon and space\)
-Example: ($prefix): Add user authentication system"
+    $prompt_text = $"($prompt_text)
+4. MUST start with '($prefix): '"
   } else {
-    $prompt_text = $"($prompt_text)4. Use conventional prefixes like 'feat:', 'fix:', 'docs:', etc."
+    $prompt_text = $"($prompt_text)
+4. Use conventional prefixes like 'feat:', 'fix:', 'docs:', etc."
   }
 
   $prompt_text = $"($prompt_text)
 
 PR Description Guidelines:
-1. Start with a succinct 1-2 sentence summary
-2. Add a blank line
-3. Follow with detailed information at the bottom
+1. Start with a 1-2 sentence summary
+2. List key technical changes as bullet points
+3. Focus on facts, not assumptions
+
+Important:
+- Return just the PR content, no additional text or explanation
+- Do not include labels like 'Title:' or 'Description:'
+- Do not use markdown code blocks or headers
 
 Branch: ($context.branch) → ($context.target)
-Recent commits:($context.commits)
-
-Changed files:($context.files)
+Commits:($context.commits)
+Files:($context.files)
 
 Output Format:
-Title line here
-Brief succinct summary of what this PR accomplishes in 1-2 sentences.
+Title line
+Summary sentence.
 
-## Details
-- Specific implementation details
-- Technical changes made
-- Files modified and why
-- Any architectural decisions
+- Technical change 1
+- Technical change 2
 
-## Context
-Additional background information, motivation, or considerations if relevant.
-
-Changes diff:($context.diff)"
+Diff:($context.diff)"
 
   $prompt_text
 }
