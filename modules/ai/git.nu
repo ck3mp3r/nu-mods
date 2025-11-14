@@ -182,12 +182,15 @@ def git-pr [
       git-pr $model $prefix $target
     }
     "e" => {
-      let edited_title = (input $"Edit title [($title)]: ")
-      let final_title = if $edited_title != "" { $edited_title } else { $title }
-      print $"\nUpdated PR:\n"
-      print $"Title: ($final_title)"
-      print $"Description:\n($description)\n"
-      create_or_update_github_pr $final_title $description $target
+      let edited_title = (input "Edit title: ")
+      if $edited_title != "" {
+        print $"\nUpdated PR:\n"
+        print $"Title: ($edited_title)"
+        print $"Description:\n($description)\n"
+        create_or_update_github_pr $edited_title $description $target
+      } else {
+        print "Operation aborted."
+      }
     }
 
     "a" => {
