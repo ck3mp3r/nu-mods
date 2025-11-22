@@ -8,11 +8,11 @@
       },
       "locked": {
         "dir": "base-nixpkgs",
-        "lastModified": 1763822234,
-        "narHash": "sha256-zNxCwQtdiP/Ra/DWG/PnR/55inOdrLij4tGzfzMX8U0=",
+        "lastModified": 1763834325,
+        "narHash": "sha256-9X9VXUmSXtOBUbPCzyK0l0/d9WuHIFbg6OVFOoeE13c=",
         "owner": "ck3mp3r",
         "repo": "flakes",
-        "rev": "f037cd474da756dcacddf2e598da650542a89e60",
+        "rev": "71f3c2849bbe83048085540050631d30adfe5401",
         "type": "github"
       },
       "original": {
@@ -29,16 +29,20 @@
         "unstable": "unstable_2"
       },
       "locked": {
-        "path": "../base-nixpkgs",
-        "type": "path"
+        "dir": "base-nixpkgs",
+        "lastModified": 1763822234,
+        "narHash": "sha256-zNxCwQtdiP/Ra/DWG/PnR/55inOdrLij4tGzfzMX8U0=",
+        "owner": "ck3mp3r",
+        "repo": "flakes",
+        "rev": "f037cd474da756dcacddf2e598da650542a89e60",
+        "type": "github"
       },
       "original": {
-        "path": "../base-nixpkgs",
-        "type": "path"
-      },
-      "parent": [
-        "topiary-nu"
-      ]
+        "dir": "base-nixpkgs",
+        "owner": "ck3mp3r",
+        "repo": "flakes",
+        "type": "github"
+      }
     },
     "cachix": {
       "inputs": {
@@ -398,11 +402,11 @@
       },
       "locked": {
         "dir": "topiary-nu",
-        "lastModified": 1763822234,
-        "narHash": "sha256-zNxCwQtdiP/Ra/DWG/PnR/55inOdrLij4tGzfzMX8U0=",
+        "lastModified": 1763834325,
+        "narHash": "sha256-9X9VXUmSXtOBUbPCzyK0l0/d9WuHIFbg6OVFOoeE13c=",
         "owner": "ck3mp3r",
         "repo": "flakes",
-        "rev": "f037cd474da756dcacddf2e598da650542a89e60",
+        "rev": "71f3c2849bbe83048085540050631d30adfe5401",
         "type": "github"
       },
       "original": {
