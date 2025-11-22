@@ -1,4 +1,8 @@
 use ../common/help show-help
+use provider.nu
+
+# Default AI model for git operations
+const DEFAULT_MODEL = "github-copilot/gpt-4.1"
 
 # AI-powered git commands - show help
 export def "ai git" [] {
@@ -7,7 +11,7 @@ export def "ai git" [] {
 
 # Create a new git branch with an AI-generated name based on current changes or user input
 export def "ai git branch" [
-  --model (-m): string = "gpt-4.1"
+  --model (-m): string = $DEFAULT_MODEL
   --description (-d): string
   --prefix (-p): string
   --from-current
@@ -17,7 +21,7 @@ export def "ai git branch" [
 
 # Create a pull request with AI-generated title and description based on branch changes
 export def "ai git pr" [
-  --model (-m): string = "gpt-4.1"
+  --model (-m): string = $DEFAULT_MODEL
   --prefix (-p): string
   --target (-t): string = "main"
 ] {
@@ -26,7 +30,7 @@ export def "ai git pr" [
 
 # Generate and apply an AI-written commit message based on staged changes
 export def "ai git commit" [
-  --model (-m): string = "gpt-4.1"
+  --model (-m): string = $DEFAULT_MODEL
 ] {
   git-commit $model
 }
@@ -73,7 +77,12 @@ def git-branch [
 
   print "Generating branch name..."
 
-  let branch_name = (mods --model $model --quiet --raw --no-cache $prompt | str trim)
+  let branch_name = try {
+    provider run $prompt $model
+  } catch {|err|
+    print $"Error generating branch name: ($err.msg)"
+    return
+  }
 
   print $"\nSuggested branch name: ($branch_name)\n"
   print "Choose an action: [c]reate, [r]etry, [e]dit, [a]bort\n"
@@ -160,8 +169,12 @@ def git-pr [
 
   print "Generating PR title and description..."
 
-  let generated = (mods --model $model --quiet --raw --no-cache $pr_content | str trim)
-  let generated_clean = ($generated | split row "</think>" | last | str trim)
+  let generated_clean = try {
+    provider run $pr_content $model
+  } catch {|err|
+    print $"Error generating PR: ($err.msg)"
+    return
+  }
 
   # Parse title and description from generated content
   let lines = ($generated_clean | lines)
@@ -219,14 +232,16 @@ def git-commit [
 
   print "Generating commit message..."
 
-  mut message = ""
-  if $prefix != "" {
-    $message = $"($prefix): (mods --model $model --quiet --raw --no-cache $prompt)"
-  } else {
-    $message = (mods --model $model --quiet --raw --no-cache $prompt)
+  mut message = try {
+    provider run $prompt $model
+  } catch {|err|
+    print $"Error generating commit message: ($err.msg)"
+    return
   }
 
-  $message = ($message | split row "</think>" | last | str trim)
+  if $prefix != "" {
+    $message = $"($prefix): ($message)"
+  }
 
   print "\nGenerated Commit Message:\n"
   print $message
