@@ -17,3 +17,6 @@ export def main [] {
 
 # Re-export all git commands from git.nu
 export use ./git.nu *
+
+# Export provider module for AI interactions
+export use ./provider.nu *

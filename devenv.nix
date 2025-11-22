@@ -7,7 +7,14 @@
   packages = [
     pkgs.nushell
     pkgs.gh
+    pkgs.topiary
+    pkgs.topiary-nu
   ];
+
+  env = {
+    TOPIARY_CONFIG_FILE = "${pkgs.topiary-nu}/languages.ncl";
+    TOPIARY_LANGUAGE_DIR = "${pkgs.topiary-nu}/languages";
+  };
 
   scripts = {
     test = {
@@ -19,12 +26,21 @@
       description = "Check Nushell syntax for all .nu files";
     };
     fmt = {
-      exec = "echo 'No formatter configured for Nushell yet'";
-      description = "Format Nushell code (placeholder)";
+      exec = "find . -name '*.nu' -type f -exec topiary format --language nu --configuration ${pkgs.topiary-nu} {} \\;";
+      description = "Format Nushell code with topiary";
     };
   };
 
   git-hooks.hooks = {
+    # Format Nushell files before commit
+    nu-format = {
+      enable = true;
+      name = "Format Nushell files";
+      entry = "${pkgs.topiary}/bin/topiary format --configuration ${pkgs.topiary-nu}";
+      language = "system";
+      files = "\\.nu$";
+      pass_filenames = true;
+    };
     # Check syntax before commit
     nu-syntax-check = {
       enable = true;

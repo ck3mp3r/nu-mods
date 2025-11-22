@@ -2,13 +2,18 @@
   description = "Collection of Nushell modules for extending shell functionality";
 
   inputs = {
-    nixpkgs.url = "github:NixOs/nixpkgs/nixpkgs-unstable";
+    base-nixpkgs.url = "github:ck3mp3r/flakes?dir=base-nixpkgs";
+    nixpkgs.follows = "base-nixpkgs/unstable";
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
     devenv = {
       url = "github:cachix/devenv";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    topiary-nu = {
+      url = "github:ck3mp3r/flakes?dir=topiary-nu";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -21,7 +26,8 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       systems = ["aarch64-darwin" "aarch64-linux" "x86_64-linux"];
       perSystem = {system, ...}: let
-        pkgs = import inputs.nixpkgs {inherit system;};
+        overlays = [inputs.topiary-nu.overlays.default];
+        pkgs = import inputs.nixpkgs {inherit system overlays;};
       in {
         packages = let
           # Helper function to create individual module packages with dependencies
@@ -46,10 +52,11 @@
 
                 # Copy dependencies at the same level (as sibling modules)
                 ${pkgs.lib.concatMapStringsSep "\n" (dep: ''
-                  if [ -d "${dep}/share/nushell/modules" ]; then
-                    cp -r "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
-                  fi
-                '') dependencies}
+                    if [ -d "${dep}/share/nushell/modules" ]; then
+                      cp -r "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
+                    fi
+                  '')
+                  dependencies}
 
                 runHook postInstall
               '';
