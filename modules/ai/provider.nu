@@ -2,6 +2,9 @@
 # This module provides a simple interface to interact with AI providers
 # Currently uses OpenCode CLI, but can be easily swapped for other providers
 
+# Fixed session ID for git automation to avoid polluting session list
+const SESSION_ID = "ai-git-automation"
+
 # Run an AI prompt and return the response
 # 
 # # Arguments
@@ -14,7 +17,7 @@ export def run [
   prompt: string
   model: string
 ]: nothing -> string {
-  let response = (opencode run --model $model $prompt | complete)
+  let response = (opencode run --model $model --session $SESSION_ID $prompt | complete)
 
   # Check for errors in stderr first
   if ($response.stderr | str trim) != "" {
