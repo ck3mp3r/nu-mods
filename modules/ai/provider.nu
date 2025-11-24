@@ -1,9 +1,12 @@
 # AI provider abstraction layer
 # This module provides a simple interface to interact with AI providers
-# Currently uses OpenCode CLI, but can be easily swapped for other providers
-
-# Fixed session ID for git automation to avoid polluting session list
-const SESSION_ID = "ai-git-automation"
+# 
+# NOTE: OpenCode has a bug where using --session with non-existent sessions causes hanging.
+# Additionally, using OpenCode without --session creates a new session for every call,
+# polluting the session list. There's currently no stateless mode in OpenCode.
+#
+# TODO: Consider switching to a different provider (e.g., direct API calls to Anthropic/OpenAI)
+# or wait for OpenCode to add a stateless mode.
 
 # Run an AI prompt and return the response
 # 
@@ -17,7 +20,9 @@ export def run [
   prompt: string
   model: string
 ]: nothing -> string {
-  let response = (opencode run --model $model --session $SESSION_ID $prompt | complete)
+  # WARNING: This creates a new session for every call, polluting the session list.
+  # This is a known issue with OpenCode - see comments above.
+  let response = (opencode run --model $model $prompt | complete)
 
   # Check for errors in stderr first
   if ($response.stderr | str trim) != "" {
