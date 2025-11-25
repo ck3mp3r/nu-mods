@@ -22,35 +22,23 @@ export def run [
 ]: nothing -> string {
   # WARNING: This creates a new session for every call, polluting the session list.
   # This is a known issue with OpenCode - see comments above.
-  let response = (opencode run --model $model $prompt | complete)
-
-  # Check for errors in stderr first
-  if ($response.stderr | str trim) != "" {
+  let result = try {
+    opencode run --model $model $prompt
+  } catch {|err|
     error make {
       msg: "AI provider error"
       label: {
-        text: $response.stderr
-        span: (metadata $prompt).span
-      }
-    }
-  }
-
-  # Check for non-zero exit code
-  if $response.exit_code != 0 {
-    error make {
-      msg: $"AI provider failed with exit code ($response.exit_code)"
-      label: {
-        text: "Command failed"
+        text: $err.msg
         span: (metadata $prompt).span
       }
     }
   }
 
   # Clean up the response by removing thinking tags if present
-  let result = ($response.stdout | str trim | split row "</think>" | last | str trim)
+  let cleaned = ($result | str trim | split row "</think>" | last | str trim)
 
   # Check if result is empty
-  if $result == "" {
+  if $cleaned == "" {
     error make {
       msg: "AI provider returned empty response"
       label: {
@@ -60,5 +48,5 @@ export def run [
     }
   }
 
-  $result
+  $cleaned
 }
