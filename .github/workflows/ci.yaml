@@ -19,6 +19,9 @@ jobs:
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          use-gha-cache: true
+          use-flakehub: false
 
       - name: Run tests
         run: nix develop .#ci --command nu run_tests.nu
