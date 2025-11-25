@@ -136,7 +136,8 @@
           };
 
           # Minimal CI shell with just essentials for running tests
-          ci = pkgs.mkShell {
+          # mkShellNoCC avoids pulling in compiler toolchain dependencies
+          ci = pkgs.mkShellNoCC {
             packages = [
               pkgs.nushell
               pkgs.git
