@@ -13,7 +13,7 @@ export def "test provider run with valid response" [] {
     MOCK_opencode_run_--model_test-model: ({output: "AI response" exit_code: 0} | to json)
   } {
     let result = (run "test prompt" "test-model")
-    assert ($result == "AI response")
+    assert equal $result "AI response"
   }
 }
 
@@ -24,7 +24,7 @@ export def "test provider run strips thinking tags" [] {
     MOCK_opencode_run_--model_gpt-4: ({output: "<think>reasoning</think>final answer" exit_code: 0} | to json)
   } {
     let result = (run "analyze this code and provide recommendations" "gpt-4")
-    assert ($result == "final answer")
+    assert equal $result "final answer"
   }
 }
 
@@ -39,6 +39,6 @@ export def "test provider run handles empty response" [] {
     } catch {|e|
       $e.msg
     }
-    assert ($result | str contains "empty response")
+    assert str contains $result "empty response"
   }
 }
