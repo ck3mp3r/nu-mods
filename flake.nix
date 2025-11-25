@@ -134,6 +134,14 @@
               ./devenv.nix
             ];
           };
+          
+          # Minimal CI shell with just essentials for running tests
+          ci = pkgs.mkShell {
+            packages = [
+              pkgs.nushell
+              pkgs.git
+            ];
+          };
         };
 
         formatter = pkgs.alejandra;

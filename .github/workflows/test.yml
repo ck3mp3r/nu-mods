@@ -20,4 +20,4 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Run tests
-        run: nix develop --command nu run_tests.nu
+        run: nix develop .#ci --command nu run_tests.nu
