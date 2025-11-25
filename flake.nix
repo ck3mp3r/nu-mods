@@ -140,7 +140,6 @@
           ci = pkgs.mkShellNoCC {
             packages = [
               pkgs.nushell
-              pkgs.git
             ];
           };
         };
