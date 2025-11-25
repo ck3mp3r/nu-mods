@@ -1,41 +1,45 @@
 #!/usr/bin/env nu
 
 # Test runner for nu-mods
-# Auto-discovers test functions with "test " prefix
+# Auto-discovers test files and test functions
 
 def main [] {
   print "Running tests...\n"
 
-  # Test suites - files and their test functions
-  let test_suites = {
-    "tests/test_provider.nu": [
-      "test provider run with valid response"
-      "test provider run strips thinking tags"
-      "test provider run handles empty response"
-    ]
-    "tests/test_git.nu": [
-      "test ai git pr with custom model and target"
-      "test ai git pr with prefix"
-      "test ai git commit with custom model"
-      "test ai git branch with description and prefix"
-      "test ai git branch from current"
-      "test ai git commit extracts branch prefix"
-    ]
-  }
+  # Discover all test files
+  let test_files = (glob tests/test_*.nu)
 
   let results = (
-    $test_suites | items {|test_file test_list|
+    $test_files | each {|test_file|
       print $"=== Running tests from ($test_file) ==="
 
+      # Create a temporary script to discover tests
+      let discover_script = $"
+use std
+source ($test_file)
+
+scope commands 
+  | where type == 'custom' 
+  | where name starts-with 'test ' 
+  | get name 
+  | to json"
+
+      # Run discovery
+      let test_commands = (
+        nu --no-config-file -c $discover_script | from json
+      )
+
+      print $"Found ($test_commands | length) tests\n"
+
       # Run each test
-      $test_list | each {|test_name|
+      $test_commands | each {|test_name|
         try {
           nu --no-config-file -c $"source ($test_file); ($test_name)"
           print $"✓ ($test_name)"
-          {test: $test_name status: "pass"}
+          {file: $test_file test: $test_name status: "pass"}
         } catch {|err|
           print $"✗ ($test_name): ($err.msg)"
-          {test: $test_name status: "fail" error: $err.msg}
+          {file: $test_file test: $test_name status: "fail" error: $err.msg}
         }
       }
     } | flatten
