@@ -43,18 +43,19 @@ def git-branch [
   from_current: bool # Branch from current branch instead of main
 ] {
   # Check if we're in a git repository
-  let git_status = (^git status --porcelain 2>/dev/null | complete)
-  if $git_status.exit_code != 0 {
+  try {
+    git status --porcelain err> /dev/null | ignore
+  } catch {
     print "Error: Not in a git repository"
     return
   }
 
   # Get current changes for context
-  let staged_diff = (^git diff --cached --name-only | str trim)
+  let staged_diff = (git diff --cached --name-only | str trim)
 
   # Determine base branch
   let base_branch = if $from_current {
-    ^git rev-parse --abbrev-ref HEAD | str trim
+    git rev-parse --abbrev-ref HEAD | str trim
   } else {
     "main"
   }
@@ -119,14 +120,15 @@ def git-pr [
   target: string # Target branch for the PR
 ] {
   # Check if we're in a git repository
-  let git_status = (^git status --porcelain 2>/dev/null | complete)
-  if $git_status.exit_code != 0 {
+  try {
+    git status --porcelain err> /dev/null | ignore
+  } catch {
     print "Error: Not in a git repository"
     return
   }
 
   # Get current branch
-  let current_branch = (^git rev-parse --abbrev-ref HEAD | str trim)
+  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
   if $current_branch == $target {
     print $"Error: Cannot create PR from ($target) to ($target)"
     return
@@ -134,10 +136,14 @@ def git-pr [
 
   # Check for existing PR first
   print $"Checking for existing PRs for branch '($current_branch)' -> '($target)'..."
-  let existing_pr = (gh pr list --head $current_branch --base $target --json number,title | complete)
+  let existing_pr = try {
+    gh pr list --head $current_branch --base $target --json number,title | str trim
+  } catch {
+    "[]"
+  }
 
-  if $existing_pr.exit_code == 0 and ($existing_pr.stdout | str trim) != "[]" {
-    let pr_data = ($existing_pr.stdout | from json | first)
+  if $existing_pr != "[]" {
+    let pr_data = ($existing_pr | from json | first)
     let pr_number = $pr_data.number
     print $"✓ Found existing PR #($pr_number): ($pr_data.title)"
     print $"→ Will update this PR with new content\n"
@@ -147,9 +153,9 @@ def git-pr [
   }
 
   # Get changes between current branch and target
-  let diff = (^git diff $"($target)...HEAD" | str trim)
-  let commit_messages = (^git log $"($target)..HEAD" --oneline | str trim)
-  let changed_files = (^git diff $"($target)...HEAD" --name-only | str trim)
+  let diff = (git diff $"($target)...HEAD" | str trim)
+  let commit_messages = (git log $"($target)..HEAD" --oneline | str trim)
+  let changed_files = (git diff $"($target)...HEAD" --name-only | str trim)
 
   if $diff == "" {
     print $"No changes found between ($current_branch) and ($target)"
@@ -219,9 +225,9 @@ def git-pr [
 def git-commit [
   model: string # AI model to use for commit message generation
 ] {
-  let branch = (^git rev-parse --abbrev-ref HEAD | str trim)
+  let branch = (git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
-  let diff = (^git diff --cached | str trim)
+  let diff = (git diff --cached | str trim)
 
   if $diff == "" {
     print "No changes staged!"
@@ -297,7 +303,7 @@ def commit_with_message [message: string] {
   $message | save -f $commit_msg_file
 
   $env.GIT_EDITOR = ($env.EDITOR? | default "vim")
-  ^git commit --edit --file $commit_msg_file
+  git commit --edit --file $commit_msg_file
 
   rm $commit_msg_file
 }
@@ -342,20 +348,20 @@ def create_git_branch [branch_name: string base_branch: string] {
   print $"Creating branch: ($branch_name) from ($base_branch)"
 
   # First checkout the base branch if not already on it
-  if $base_branch != "main" or (^git rev-parse --abbrev-ref HEAD | str trim) != $base_branch {
-    let checkout_result = (^git checkout $base_branch | complete)
-    if $checkout_result.exit_code != 0 {
-      print $"❌ Failed to checkout base branch ($base_branch): ($checkout_result.stderr)"
+  if $base_branch != "main" or (git rev-parse --abbrev-ref HEAD | str trim) != $base_branch {
+    try {
+      git checkout $base_branch
+    } catch {|err|
+      print $"❌ Failed to checkout base branch ($base_branch): ($err.msg)"
       return
     }
   }
 
-  let result = (^git checkout -b $branch_name | complete)
-
-  if $result.exit_code == 0 {
+  try {
+    git checkout -b $branch_name
     print $"✅ Successfully created and switched to branch: ($branch_name) from ($base_branch)"
-  } else {
-    print $"❌ Failed to create branch: ($result.stderr)"
+  } catch {|err|
+    print $"❌ Failed to create branch: ($err.msg)"
   }
 }
 
@@ -408,42 +414,44 @@ Diff:($context.diff)"
 
 def create_or_update_github_pr [title: string description: string target: string] {
   # Check if PR already exists for current branch
-  let current_branch = (^git rev-parse --abbrev-ref HEAD | str trim)
-  let existing_pr = (gh pr list --head $current_branch --base $target --json number,title | complete)
+  let current_branch = (git rev-parse --abbrev-ref HEAD | str trim)
+  let existing_pr = try {
+    gh pr list --head $current_branch --base $target --json number,title | str trim
+  } catch {
+    "[]"
+  }
 
-  if $existing_pr.exit_code == 0 and ($existing_pr.stdout | str trim) != "[]" {
-    let pr_data = ($existing_pr.stdout | from json | first)
+  if $existing_pr != "[]" {
+    let pr_data = ($existing_pr | from json | first)
     let pr_number = $pr_data.number
 
     print $"Updating PR #($pr_number)..."
 
-    let repo_result = (gh repo view --json owner,name | complete)
-    if $repo_result.exit_code != 0 {
-      print $"❌ Failed to get repo info: ($repo_result.stderr)"
+    let repo = try {
+      gh repo view --json owner,name | from json
+    } catch {|err|
+      print $"❌ Failed to get repo info: ($err.msg)"
       return
     }
 
-    let repo = ($repo_result.stdout | from json)
     let owner = $repo.owner.login
     let name = $repo.name
 
-    let update_result = (gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($description)" | complete)
-
-    if $update_result.exit_code == 0 {
+    try {
+      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($description)" | ignore
       print $"✅ Successfully updated PR #($pr_number)"
       gh pr view $pr_number --web
-    } else {
-      print $"❌ Failed to update PR: ($update_result.stderr)"
+    } catch {|err|
+      print $"❌ Failed to update PR: ($err.msg)"
     }
   } else {
     print $"Creating new PR..."
 
-    let result = (gh pr create --title $title --body $description --base $target | complete)
-
-    if $result.exit_code == 0 {
-      print $"✅ Successfully created PR: ($result.stdout)"
-    } else {
-      print $"❌ Failed to create PR: ($result.stderr)"
+    try {
+      let result = (gh pr create --title $title --body $description --base $target)
+      print $"✅ Successfully created PR: ($result)"
+    } catch {|err|
+      print $"❌ Failed to create PR: ($err.msg)"
     }
   }
 }

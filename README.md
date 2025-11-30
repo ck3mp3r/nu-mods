@@ -88,9 +88,31 @@ nix develop
 
 # Available commands
 check    # Check Nushell syntax
-test     # Run tests (placeholder)
+test     # Run tests
 fmt      # Format code (placeholder)
 ```
+
+### Testing
+
+Tests use Nushell's testing framework with `--no-config-file` and mocked external commands:
+
+```bash
+# Run all tests
+nu run_tests.nu
+
+# Run a specific test file
+nu --no-config-file tests/ai/test_provider.nu
+
+# Run tests with specific mock values
+MOCK_git_status_--porcelain="clean" nu --no-config-file tests/ai/test_git.nu
+```
+
+**Mock Pattern**: Tests use `--wrapped` functions that check for `MOCK_<command>_<args>` environment variables:
+- `MOCK_git_status_--porcelain="?? file.txt"` - Mock `git status --porcelain`
+- `MOCK_git_diff_--cached="changes"` - Mock `git diff --cached`
+- `MOCK_opencode_run_--model_gpt-4_prompt="response"` - Mock `opencode run --model gpt-4 prompt`
+
+This allows tests to run without actual external dependencies like `git`, `gh`, or `opencode`.
 
 ## Package Structure
 
