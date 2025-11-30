@@ -83,6 +83,13 @@
             dependencies = [self.packages.${system}.common];
           };
 
+          ci = mkNuModule {
+            pname = "ci";
+            src = ./modules/ci;
+            description = "CI/CD SCM flow utilities for Nushell";
+            dependencies = [self.packages.${system}.common];
+          };
+
           # Global package that bundles all modules
           default = pkgs.stdenvNoCC.mkDerivation {
             pname = "nu-mods";
@@ -92,6 +99,7 @@
             buildInputs = [
               self.packages.${system}.common
               self.packages.${system}.ai
+              self.packages.${system}.ci
             ];
 
             dontBuild = true;
@@ -111,6 +119,7 @@
                 '') [
                   self.packages.${system}.common
                   self.packages.${system}.ai
+                  self.packages.${system}.ci
                 ]}
 
               # Copy any additional files (README, etc.)
@@ -152,6 +161,7 @@
           nu-mods = self.packages.${prev.system}.default;
           nu-mods-common = self.packages.${prev.system}.common;
           nu-mods-ai = self.packages.${prev.system}.ai;
+          nu-mods-ci = self.packages.${prev.system}.ci;
         };
       };
     };

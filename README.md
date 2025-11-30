@@ -64,6 +64,22 @@ AI-powered git operations for intelligent workflow automation.
 - Configurable AI models via `--model` flag
 - Requires [mods CLI](https://github.com/charmbracelet/mods) for AI integration
 
+### CI Module
+CI/CD SCM flow utilities for standardized branch management.
+
+**Installation**: `nix profile install github:ck3mp3r/nu-mods#ci`
+
+**Commands**:
+- `ci scm branch` - Create standardized branches with flow-based naming
+
+**Features**:
+- Standardized branch naming: `<prefix>/<flow-type>/<description>`
+- Flow types: `--feature`, `--fix`, `--hotfix`, `--release`, `--chore`
+- Pipe prefix from stdin: `"JIRA-123" | ci scm branch "description"`
+- Custom base branch: `--from <branch>`
+- Create without checkout: `--no-checkout`
+- Built-in logging with `std/log` (controlled by `NU_LOG_LEVEL`)
+
 ## Usage
 
 Once installed, import modules in your Nushell session:
@@ -76,6 +92,15 @@ use ai
 ai git commit
 ai git create branch --prefix "JIRA-123" --description "Add login feature"
 ai git create pr --target "develop"
+
+# Import the CI module
+use ci
+
+# Use CI SCM commands
+"JIRA-1234" | ci scm branch "add user login" --feature
+ci scm branch "v2.1.0" --release --from develop
+"SEC-999" | ci scm branch "patch vulnerability" --hotfix --from production
+ci scm branch "update dependencies" --chore --no-checkout
 ```
 
 ## Development
