@@ -1,11 +1,9 @@
-#!/usr/bin/env nu
-
 # Test git.nu EXPORTED functions with mocked external commands
 # Focus: Test the public API, validate parameters pass through correctly
 
 use std/assert
-use mocks.nu *
-use ../modules/ai/git.nu *
+use ../mocks.nu *
+use ../../modules/ai/git.nu *
 
 # Test ai git pr - exported function
 # Validates: model parameter, target parameter, prefix in prompt

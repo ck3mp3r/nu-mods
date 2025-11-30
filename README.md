@@ -64,6 +64,45 @@ AI-powered git operations for intelligent workflow automation.
 - Configurable AI models via `--model` flag
 - Requires [mods CLI](https://github.com/charmbracelet/mods) for AI integration
 
+### CI Module
+CI/CD utilities for SCM workflows and GitHub operations.
+
+**Installation**: `nix profile install github:ck3mp3r/nu-mods#ci`
+
+**SCM Commands**:
+- `ci scm branch` - Create standardized branches with flow-based naming
+
+**GitHub PR Commands**:
+- `ci github pr check` - Check for existing PRs
+- `ci github pr create` - Create a new pull request
+- `ci github pr list` - List pull requests
+- `ci github pr update` - Update existing PR (title/body)
+
+**GitHub Workflow Commands**:
+- `ci github workflow list` - List workflow runs
+- `ci github workflow view` - View specific run details
+- `ci github workflow logs` - Get workflow run logs
+- `ci github workflow cancel` - Cancel a running workflow
+- `ci github workflow rerun` - Re-run a workflow
+
+**Nix Flake Commands**:
+- `ci nix flake check` - Check flake for issues
+- `ci nix flake update` - Update flake inputs (all or specific)
+- `ci nix flake show` - Show flake outputs
+- `ci nix flake list-packages` - List all buildable packages
+- `ci nix flake build` - Build packages (all or specific)
+
+**Nix Cache Commands**:
+- `ci nix cache push` - Push store paths to binary cache
+
+**Features**:
+- Standardized branch naming: `<prefix>/<flow-type>/<description>`
+- Flow types: `--feature`, `--fix`, `--hotfix`, `--release`, `--chore`
+- Pipe prefix from stdin: `"JIRA-123" | ci scm branch "description"`
+- Complete GitHub PR management
+- Workflow run inspection and control
+- Built-in logging with `std/log` (controlled by `NU_LOG_LEVEL`)
+
 ## Usage
 
 Once installed, import modules in your Nushell session:
@@ -76,6 +115,41 @@ use ai
 ai git commit
 ai git create branch --prefix "JIRA-123" --description "Add login feature"
 ai git create pr --target "develop"
+
+# Import the CI module
+use ci
+
+# SCM branch management
+"JIRA-1234" | ci scm branch "add user login" --feature
+ci scm branch "v2.1.0" --release --from develop
+"SEC-999" | ci scm branch "patch vulnerability" --hotfix --from production
+ci scm branch "update dependencies" --chore --no-checkout
+
+# GitHub PR operations
+ci github pr check --target main
+ci github pr create "feat: add feature" "Description here" --target main
+ci github pr list --state open
+ci github pr update 42 --title "New title"
+
+# GitHub workflow operations
+ci github workflow list
+ci github workflow list --status failure
+ci github workflow view 12345
+ci github workflow logs 12345
+ci github workflow cancel 12345
+ci github workflow rerun 12345
+
+# Nix operations
+ci nix flake check
+ci nix flake check --flake ../myflake
+ci nix flake update
+ci nix flake update nixpkgs
+ci nix flake show
+ci nix flake list-packages
+ci nix flake build
+ci nix flake build mypackage
+ci nix cache push /nix/store/abc-pkg --cache s3://mybucket
+ci nix cache push /nix/store/abc /nix/store/def --cache file:///cache
 ```
 
 ## Development
