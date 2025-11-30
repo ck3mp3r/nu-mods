@@ -1,188 +1,306 @@
 use ../common/help show-help
 use std/log
 
-# Nix flake operations - show help
+# Nix operations - show help
 export def "ci nix" [] {
   show-help "ci nix"
 }
 
 # ============================================================================
-# FLAKE COMMANDS
+# HELPER FUNCTIONS
 # ============================================================================
 
-# Nix flake operations - show help
-export def "ci nix flake" [] {
-  show-help "ci nix flake"
-}
+# Normalize input to list of flake paths
+def normalize-flakes []: [list<string> -> list<string> string -> list<string> nothing -> list<string>] {
+  let input = $in
 
-# Check flake for issues
-export def "ci nix flake check" [
-  --flake: string = "." # Path to flake (default: current directory)
-]: [
-  nothing -> nothing
-] {
-  log info $"Checking flake at: ($flake)"
-
-  try {
-    if $flake != "." {
-      nix flake check --flake $flake
-    } else {
-      nix flake check
-    }
-    print "✓ Flake check passed"
-  } catch {|err|
-    log error $"Flake check failed: ($err.msg)"
-    error make {msg: $"Flake check failed: ($err.msg)"}
+  if ($input | is-empty) {
+    ["."]
+  } else if ($input | describe | str starts-with "list") {
+    $input
+  } else {
+    [$input]
   }
 }
 
-# Update flake inputs
-export def "ci nix flake update" [
+# Detect current Nix system
+def detect-system []: [nothing -> string] {
+  try {
+    let host_info = (sys host)
+    let system = ($host_info | get long_os_version | parse "{name} {version}" | get name.0)
+    let arch = ($host_info | get arch)
+    match [$system $arch] {
+      ["Darwin" "aarch64"] => "aarch64-darwin"
+      ["Darwin" "x86_64"] => "x86_64-darwin"
+      ["Linux" "aarch64"] => "aarch64-linux"
+      ["Linux" "x86_64"] => "x86_64-linux"
+      _ => {
+        log error $"Unsupported system: ($system) ($arch)"
+        "unknown"
+      }
+    }
+  } catch {
+    log error "Failed to detect system"
+    "unknown"
+  }
+}
+
+# ============================================================================
+# CHECK COMMAND
+# ============================================================================
+
+# Check flakes for issues (pipeline-friendly)
+export def "ci nix check" []: [
+  list<string> -> table
+  string -> table
+  nothing -> table
+] {
+  let flakes = $in | normalize-flakes
+
+  log info $"Checking ($flakes | length) flakes"
+
+  $flakes | each {|flake|
+    log info $"Checking: ($flake)"
+
+    let result = try {
+      if $flake != "." {
+        nix flake check --flake $flake
+      } else {
+        nix flake check
+      }
+      {flake: $flake status: "success" error: null}
+    } catch {|err|
+      log error $"Check failed for ($flake): ($err.msg)"
+      {flake: $flake status: "failed" error: $err.msg}
+    }
+
+    $result
+  }
+}
+
+# ============================================================================
+# UPDATE COMMAND
+# ============================================================================
+
+# Update flake inputs (pipeline-friendly)
+export def "ci nix update" [
   input?: string # Specific input to update (optional - updates all if not provided)
-  --flake: string = "." # Path to flake
 ]: [
-  nothing -> nothing
+  list<string> -> table
+  string -> table
+  nothing -> table
 ] {
+  let flakes = $in | normalize-flakes
+
   if ($input | is-not-empty) {
-    log info $"Updating flake input: ($input)"
-    try {
-      nix flake update $input
-      print $"✓ Updated input: ($input)"
-    } catch {|err|
-      log error $"Failed to update ($input): ($err.msg)"
-    }
+    log info $"Updating input '($input)' in ($flakes | length) flakes"
   } else {
-    log info "Updating all flake inputs"
-    try {
-      nix flake update
-      print "✓ Updated all inputs"
-    } catch {|err|
-      log error $"Failed to update inputs: ($err.msg)"
-    }
+    log info $"Updating all inputs in ($flakes | length) flakes"
   }
-}
 
-# Show flake outputs
-export def "ci nix flake show" [
-  --flake: string = "." # Path to flake
-]: [
-  nothing -> nothing
-] {
-  log info "Showing flake outputs"
+  $flakes | each {|flake|
+    let flake_path = if $flake == "." { "." } else { $"--flake ($flake)" }
 
-  try {
-    let output = (nix flake show --json | from json)
-    print ($output | to yaml)
-  } catch {|err|
-    log error $"Failed to show flake: ($err.msg)"
-  }
-}
-
-# List all buildable packages in the flake
-export def "ci nix flake list-packages" [
-  --flake: string = "." # Path to flake
-]: [
-  nothing -> nothing
-] {
-  log info "Listing buildable packages"
-
-  try {
-    let flake_info = (nix flake show --json | from json)
-
-    if "packages" in $flake_info {
-      let packages = $flake_info.packages
-
-      for system in ($packages | columns) {
-        print $"\n($system):"
-        for pkg in ($packages | get $system | columns) {
-          print $"  - ($pkg)"
+    let result = try {
+      if ($input | is-not-empty) {
+        log info $"Updating ($input) in ($flake)"
+        if $flake == "." {
+          nix flake update $input
+        } else {
+          nix flake update $input --flake $flake
         }
+        {flake: $flake input: $input status: "success" error: null}
+      } else {
+        log info $"Updating all inputs in ($flake)"
+        if $flake == "." {
+          nix flake update
+        } else {
+          nix flake update --flake $flake
+        }
+        {flake: $flake input: "all" status: "success" error: null}
       }
-    } else {
-      print "No packages found in flake"
+    } catch {|err|
+      log error $"Update failed for ($flake): ($err.msg)"
+      {
+        flake: $flake
+        input: (if ($input | is-not-empty) { $input } else { "all" })
+        status: "failed"
+        error: $err.msg
+      }
     }
-  } catch {|err|
-    log error $"Failed to list packages: ($err.msg)"
+
+    $result
   }
 }
 
-# Build flake packages
-export def "ci nix flake build" [
-  package?: string # Specific package to build (optional - builds all if not provided)
-  --flake: string = "." # Path to flake
-]: [
-  nothing -> nothing
-] {
-  if ($package | is-not-empty) {
-    # Build specific package
-    log info $"Building package: ($package)"
-    try {
-      let store_path = (nix build $".#($package)" --print-out-paths --no-link | str trim)
-      print $"✓ Built ($package): ($store_path)"
-      print $store_path
-    } catch {|err|
-      log error $"Failed to build ($package): ($err.msg)"
-    }
-  } else {
-    # Build all packages
-    log info "Building all packages"
-    try {
-      let flake_info = (nix flake show --json | from json)
+# ============================================================================
+# PACKAGES COMMAND
+# ============================================================================
 
-      if "packages" not-in $flake_info {
-        print "No packages found in flake"
-        return
+# List packages from flakes (pipeline-friendly)
+export def "ci nix packages" []: [
+  list<string> -> table
+  string -> table
+  nothing -> table
+] {
+  let flakes = $in | normalize-flakes
+
+  log info $"Listing packages from ($flakes | length) flakes"
+
+  $flakes | each {|flake|
+    log info $"Listing packages in ($flake)"
+
+    try {
+      let flake_info = if $flake == "." {
+        nix flake show --json | from json
+      } else {
+        nix flake show --flake $flake --json | from json
       }
 
-      let packages = $flake_info.packages
+      if "packages" in $flake_info {
+        let packages = $flake_info.packages
 
-      # Determine the current Nix system
-      let nix_system = try {
-        let host_info = (sys host)
-        let system = ($host_info | get long_os_version | parse "{name} {version}" | get name.0)
-        let arch = ($host_info | get arch)
-        match [$system $arch] {
-          ["Darwin" "aarch64"] => "aarch64-darwin"
-          ["Darwin" "x86_64"] => "x86_64-darwin"
-          ["Linux" "aarch64"] => "aarch64-linux"
-          ["Linux" "x86_64"] => "x86_64-linux"
-          _ => {
-            log error $"Unsupported system: ($system) ($arch)"
-            return
+        $packages | columns | each {|system|
+          let system_packages = $packages | get $system
+
+          $system_packages | columns | each {|pkg_name|
+            {
+              flake: $flake
+              name: $pkg_name
+              system: $system
+            }
+          }
+        } | flatten
+      } else {
+        []
+      }
+    } catch {|err|
+      log error $"Failed to list packages for ($flake): ($err.msg)"
+      []
+    }
+  } | flatten
+}
+
+# ============================================================================
+# BUILD COMMAND
+# ============================================================================
+
+# Build packages from flakes (pipeline-friendly)
+export def "ci nix build" [
+  ...packages: string # Package names to build (optional - builds all if not provided)
+]: [
+  list<string> -> table
+  string -> table
+  nothing -> table
+] {
+  let flakes = $in | normalize-flakes
+  let current_system = detect-system
+
+  let packages_to_build = $packages
+
+  log info $"Building from ($flakes | length) flakes"
+
+  $flakes | each {|flake|
+    if ($packages_to_build | is-empty) {
+      # Build all packages for current system
+      log info $"Building all packages in ($flake)"
+
+      try {
+        let flake_info = if $flake == "." {
+          nix flake show --json | from json
+        } else {
+          nix flake show --flake $flake --json | from json
+        }
+
+        if "packages" not-in $flake_info {
+          log warning $"No packages found in ($flake)"
+          []
+        } else {
+          let packages = $flake_info.packages
+
+          # Use detected system or fallback to first available system
+          let target_system = if $current_system in ($packages | columns) {
+            $current_system
+          } else if $current_system == "unknown" and (($packages | columns | length) > 0) {
+            let first_system = ($packages | columns | first)
+            log warning $"System detection failed, using first available system: ($first_system)"
+            $first_system
+          } else {
+            log warning $"No packages for system ($current_system) in ($flake)"
+            return []
+          }
+
+          let system_packages = ($packages | get $target_system | columns)
+
+          $system_packages | each {|pkg|
+            log info $"Building ($pkg) from ($flake)"
+
+            try {
+              let path = if $flake == "." {
+                nix build $".#($pkg)" --print-out-paths --no-link | str trim
+              } else {
+                nix build $"($flake)#($pkg)" --print-out-paths --no-link | str trim
+              }
+
+              {
+                flake: $flake
+                package: $pkg
+                system: $target_system
+                path: $path
+                status: "success"
+                error: null
+              }
+            } catch {|err|
+              log error $"Failed to build ($pkg): ($err.msg)"
+              {
+                flake: $flake
+                package: $pkg
+                system: $target_system
+                path: null
+                status: "failed"
+                error: $err.msg
+              }
+            }
           }
         }
-      } catch {
-        # Fallback to first available system if sys host fails (e.g., in tests)
-        ($packages | columns | first)
+      } catch {|err|
+        log error $"Failed to get flake info for ($flake): ($err.msg)"
+        []
       }
+    } else {
+      # Build specific packages
+      $packages_to_build | each {|pkg|
+        log info $"Building ($pkg) from ($flake)"
 
-      if $nix_system not-in ($packages | columns) {
-        print $"No packages for system: ($nix_system)"
-        return
-      }
-
-      let system_packages = ($packages | get $nix_system | columns)
-      mut store_paths = []
-
-      for pkg in $system_packages {
-        log info $"Building ($pkg)"
         try {
-          let path = (nix build $".#($pkg)" --print-out-paths --no-link | str trim)
-          print $"✓ Built ($pkg): ($path)"
-          $store_paths = ($store_paths | append $path)
+          let path = if $flake == "." {
+            nix build $".#($pkg)" --print-out-paths --no-link | str trim
+          } else {
+            nix build $"($flake)#($pkg)" --print-out-paths --no-link | str trim
+          }
+
+          {
+            flake: $flake
+            package: $pkg
+            system: $current_system
+            path: $path
+            status: "success"
+            error: null
+          }
         } catch {|err|
           log error $"Failed to build ($pkg): ($err.msg)"
+          {
+            flake: $flake
+            package: $pkg
+            system: $current_system
+            path: null
+            status: "failed"
+            error: $err.msg
+          }
         }
       }
-
-      print $"\nBuilt ($store_paths | length) packages:"
-      for path in $store_paths {
-        print $"  ($path)"
-      }
-    } catch {|err|
-      log error $"Failed to build packages: ($err.msg)"
     }
-  }
+  } | flatten
 }
 
 # ============================================================================
@@ -194,33 +312,45 @@ export def "ci nix cache" [] {
   show-help "ci nix cache"
 }
 
-# Push store paths to binary cache
+# Push store paths to binary cache (pipeline-friendly)
 export def "ci nix cache push" [
-  ...paths: string # Store paths to push
-  --cache: string # Cache URI (e.g., s3://bucket, file:///path)
+  --cache: string # Cache URI (e.g., s3://bucket, cachix, file:///path)
 ]: [
-  nothing -> nothing
+  list<string> -> table
 ] {
+  let paths = $in
+
   if ($paths | is-empty) {
     log error "No paths provided to push"
-    return
+    return []
   }
 
   if ($cache | is-empty) {
     log error "No cache URI provided (use --cache)"
-    return
+    return []
   }
 
   log info $"Pushing ($paths | length) paths to ($cache)"
 
-  try {
-    nix copy --to $cache ...$paths
-    print $"✓ Pushed ($paths | length) paths to cache"
-    for path in $paths {
-      print $"  ($path)"
+  $paths | each {|path|
+    log info $"Pushing ($path)"
+
+    try {
+      nix copy --to $cache $path
+      {
+        path: $path
+        cache: $cache
+        status: "success"
+        error: null
+      }
+    } catch {|err|
+      log error $"Failed to push ($path): ($err.msg)"
+      {
+        path: $path
+        cache: $cache
+        status: "failed"
+        error: $err.msg
+      }
     }
-  } catch {|err|
-    log error $"Failed to push to cache: ($err.msg)"
-    error make {msg: $"Failed to push to cache: ($err.msg)"}
   }
 }

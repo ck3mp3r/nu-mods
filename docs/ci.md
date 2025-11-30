@@ -34,15 +34,17 @@ ci github workflow list --status failure
 ```
 
 ### 3. Nix Operations
-Flake and cache management.
+Pipeline-friendly flake and cache management.
 
 📖 [Full Nix Documentation](ci-nix.md)
 
 **Quick Example:**
 ```nu
-ci nix flake check
-ci nix flake build mypackage
-ci nix cache push /nix/store/pkg --cache s3://bucket
+# Pipeline composition
+ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+
+# Multi-flake operations
+["." "../backend"] | ci nix check | ci nix update | ci nix build
 ```
 
 ## Complete Workflow Example
@@ -54,12 +56,11 @@ ci nix cache push /nix/store/pkg --cache s3://bucket
 "PROJ-123" | ci scm branch "add authentication" --feature
 
 # 2. Make changes, then build and test with Nix
-ci nix flake check
-ci nix flake build
+ci nix check
+let build_results = (ci nix build)
 
-# 3. Push to cache
-let path = (ci nix flake build myapp | last)
-ci nix cache push $path --cache s3://mybucket
+# 3. Push successful builds to cache
+$build_results | where status == "success" | get path | ci nix cache push --cache s3://mybucket
 
 # 4. Create PR
 ci github pr create "feat: add authentication" "Implements user auth" --target main
@@ -76,8 +77,8 @@ ci github workflow view 12345
 "SEC-999" | ci scm branch "fix vulnerability" --hotfix --from production
 
 # 2. Verify fix
-ci nix flake check
-ci nix flake build
+ci nix check
+ci nix build
 
 # 3. Create urgent PR
 ci github pr create "hotfix: security patch" "Critical fix" --target production
@@ -93,13 +94,10 @@ ci github workflow list --status in_progress
 ci scm branch "v2.1.0" --release --from develop
 
 # 2. Update dependencies
-ci nix flake update
+ci nix update
 
-# 3. Build all packages
-ci nix flake build
-
-# 4. Push to cache
-# (script to push all built paths)
+# 3. Build all packages and push to cache
+ci nix build | where status == "success" | get path | ci nix cache push --cache s3://releases
 
 # 5. Create release PR
 ci github pr create "release: v2.1.0" "Release notes..." --target main
@@ -126,17 +124,23 @@ ci github pr create "release: v2.1.0" "Release notes..." --target main
 ```nu
 # Create branch and build in one flow
 "TICKET-123" | ci scm branch "new feature" --feature
-ci nix flake build
+ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
 ci github pr create "feat: new feature" "Description"
 ```
 
-### Update → Check → Build
+### Update → Check → Build → Push
 
 ```nu
-# Update dependencies and verify
-ci nix flake update
-ci nix flake check
-ci nix flake build
+# Update, verify, build, and push - all in pipeline
+ci nix update 
+  | get flake 
+  | ci nix check 
+  | where status == "success"
+  | get flake
+  | ci nix build
+  | where status == "success"
+  | get path
+  | ci nix cache push --cache cachix
 ```
 
 ### List → View → Logs
@@ -152,7 +156,7 @@ ci github workflow logs 12345
 
 1. **Always check before committing:**
    ```nu
-   ci nix flake check
+   ci nix check
    ```
 
 2. **Use ticket prefixes consistently:**
@@ -160,15 +164,19 @@ ci github workflow logs 12345
    "PROJ-123" | ci scm branch "description" --feature
    ```
 
-3. **Cache build outputs:**
+3. **Use pipelines for build → push:**
    ```nu
-   let path = (ci nix flake build pkg | last)
-   ci nix cache push $path --cache s3://bucket
+   ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
    ```
 
 4. **Monitor workflows after PR:**
    ```nu
-   ci github workflow list
+   ci github workflow list --status failure
+   ```
+
+5. **Operate on multiple flakes:**
+   ```nu
+   ["." "../backend" "../frontend"] | ci nix check | ci nix build
    ```
 
 ## Error Handling

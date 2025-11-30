@@ -1,16 +1,16 @@
-# Test ci/nix.nu with mocked nix commands
-# Focus: Test flake operations and cache management
+# Test ci/nix.nu with pipeline-oriented API
+# Focus: Test flake operations with stdin/table outputs and cache management
 
 use std/assert
 use ../mocks.nu *
 use ../../modules/ci/nix.nu *
 
 # ============================================================================
-# FLAKE CHECK TESTS
+# CHECK TESTS
 # ============================================================================
 
-# Test 1: Flake check success
-export def "test ci nix flake check success" [] {
+# Test 1: Check single flake (default)
+export def "test ci nix check single flake" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_flake_check": ({output: "" exit_code: 0} | to json)
@@ -18,87 +18,158 @@ export def "test ci nix flake check success" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake check
+ci nix check | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "Flake check passed") $"Expected success message but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 result but got: ($result | length)"
+    assert ($result.0.flake == ".") $"Expected flake '.' but got: ($result.0.flake)"
+    assert ($result.0.status == "success") $"Expected success but got: ($result.0.status)"
   }
 }
 
-# Test 2: Flake check with custom path
-export def "test ci nix flake check custom path" [] {
+# Test 2: Check multiple flakes from pipeline
+export def "test ci nix check multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--flake_.._myflake": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--flake_.._backend": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake check --flake '../myflake'
+['.' '../backend'] | ci nix check | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "Flake check passed") $"Expected success but got: ($output)"
+    assert (($result | length) == 2) $"Expected 2 results but got: ($result | length)"
+    assert ($result.0.status == "success") $"Expected success for flake 0"
+    assert ($result.1.status == "success") $"Expected success for flake 1"
   }
 }
 
-# ============================================================================
-# FLAKE UPDATE TESTS
-# ============================================================================
-
-# Test 3: Update all inputs
-export def "test ci nix flake update all" [] {
+# Test 3: Check with failure
+export def "test ci nix check with failure" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_update": ({output: "Updated inputs" exit_code: 0} | to json)
+    "MOCK_nix_flake_check": ({output: "error: some issue" exit_code: 1} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake update
+ci nix check | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "Updated") $"Expected update message but got: ($output)"
-  }
-}
-
-# Test 4: Update specific input
-export def "test ci nix flake update specific input" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_update_nixpkgs": ({output: "Updated nixpkgs" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix flake update nixpkgs
-"
-    let output = (nu -c $test_script | str join "\n")
-
-    assert ($output | str contains "nixpkgs") $"Expected nixpkgs update but got: ($output)"
+    assert ($result.0.status == "failed") $"Expected failed status"
+    assert ($result.0.error != null) $"Expected error message"
   }
 }
 
 # ============================================================================
-# FLAKE SHOW TESTS
+# UPDATE TESTS
 # ============================================================================
 
-# Test 5: Show flake outputs
-export def "test ci nix flake show" [] {
+# Test 4: Update all inputs in single flake
+export def "test ci nix update all inputs" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"default":{"type":"derivation"}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_update": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake show
+ci nix update | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "packages") $"Expected packages output but got: ($output)"
+    assert ($result.0.status == "success") $"Expected success"
+    assert ($result.0.input == "all") $"Expected 'all' inputs"
+  }
+}
+
+# Test 5: Update specific input
+export def "test ci nix update specific input" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_update_nixpkgs": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix update nixpkgs | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.0.status == "success") $"Expected success"
+    assert ($result.0.input == "nixpkgs") $"Expected nixpkgs input"
+  }
+}
+
+# Test 6: Update multiple flakes
+export def "test ci nix update multiple flakes" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_update": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_update_--flake_.._backend": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['.' '../backend'] | ci nix update | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 results"
+  }
+}
+
+# ============================================================================
+# PACKAGES TESTS
+# ============================================================================
+
+# Test 7: List packages from single flake
+export def "test ci nix packages single flake" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix packages | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 packages"
+    assert ($result.0.name == "pkg1" or $result.0.name == "pkg2") $"Expected pkg1 or pkg2"
+    assert ($result.0.system == "x86_64-linux") $"Expected x86_64-linux system"
+  }
+}
+
+# Test 8: List packages from multiple flakes
+export def "test ci nix packages multiple flakes" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_show_--flake_.._backend_--json": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['.' '../backend'] | ci nix packages | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 packages total"
   }
 }
 
@@ -106,8 +177,8 @@ ci nix flake show
 # BUILD TESTS
 # ============================================================================
 
-# Test 6: Build all packages
-export def "test ci nix flake build all packages" [] {
+# Test 9: Build all packages
+export def "test ci nix build all packages" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
@@ -117,18 +188,20 @@ export def "test ci nix flake build all packages" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake build
+ci nix build | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "pkg1") $"Expected pkg1 but got: ($output)"
-    assert ($output | str contains "pkg2") $"Expected pkg2 but got: ($output)"
-    assert ($output | str contains "/nix/store") $"Expected store paths but got: ($output)"
+    assert (($result | length) == 2) $"Expected 2 build results"
+    assert ($result.0.status == "success") $"Expected success for pkg1"
+    assert ($result.1.status == "success") $"Expected success for pkg2"
+    assert ($result.0.path == "/nix/store/abc-pkg1" or $result.0.path == "/nix/store/def-pkg2") $"Expected store path"
   }
 }
 
-# Test 7: Build specific package
-export def "test ci nix flake build specific package" [] {
+# Test 10: Build specific package with -p flag
+export def "test ci nix build specific package" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
@@ -136,12 +209,52 @@ export def "test ci nix flake build specific package" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake build mypackage
+ci nix build mypackage | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "mypackage") $"Expected mypackage but got: ($output)"
-    assert ($output | str contains "/nix/store/xyz-mypackage") $"Expected store path but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 build result"
+    assert ($result.0.package == "mypackage") $"Expected mypackage"
+    assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
+  }
+}
+
+# Test 11: Build multiple specific packages
+export def "test ci nix build multiple packages" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix build pkg1 pkg2 | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 build results"
+  }
+}
+
+# Test 12: Build from multiple flakes
+export def "test ci nix build multiple flakes" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.._backend#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['.' '../backend'] | ci nix build pkg1 pkg2 | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 4) $"Expected 4 build results, 2 per flake"
   }
 }
 
@@ -149,58 +262,63 @@ ci nix flake build mypackage
 # CACHE PUSH TESTS
 # ============================================================================
 
-# Test 8: Push to cache
-export def "test ci nix cache push" [] {
+# Test 13: Push single path to cache
+export def "test ci nix cache push single path" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_copy_--to_s3:__mybucket__nix_store_abc-pkg": ({output: "Copying to cache" exit_code: 0} | to json)
+    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix cache push '/nix/store/abc-pkg' --cache 's3://mybucket'
+['/nix/store/abc-pkg'] | ci nix cache push --cache cachix | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "Pushed") $"Expected push confirmation but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.status == "success") $"Expected success"
+    assert ($result.0.cache == "cachix") $"Expected cachix cache"
   }
 }
 
-# Test 9: Push multiple paths to cache
+# Test 14: Push multiple paths to cache
 export def "test ci nix cache push multiple paths" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_copy_--to_s3:__cache__nix_store_abc__nix_store_def": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_copy_--to_s3:__bucket__nix_store_abc": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_copy_--to_s3:__bucket__nix_store_def": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix cache push '/nix/store/abc' '/nix/store/def' --cache 's3://cache'
+['/nix/store/abc' '/nix/store/def'] | ci nix cache push --cache 's3://bucket' | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "Pushed 2") $"Expected 2 paths pushed but got: ($output)"
+    assert (($result | length) == 2) $"Expected 2 results"
+    assert ($result.0.status == "success") $"Expected success for path 0"
+    assert ($result.1.status == "success") $"Expected success for path 1"
   }
 }
 
-# ============================================================================
-# LIST PACKAGES TESTS
-# ============================================================================
-
-# Test 10: List all buildable packages
-export def "test ci nix flake list packages" [] {
+# Test 15: Pipeline - build and push to cache
+export def "test ci nix build and push pipeline" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"default":{},"pkg1":{},"pkg2":{}},"aarch64-darwin":{"default":{},"pkg1":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg1": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix flake list-packages
+ci nix build pkg1 | where status == 'success' | get path | ci nix cache push --cache cachix | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "pkg1") $"Expected pkg1 but got: ($output)"
-    assert ($output | str contains "pkg2") $"Expected pkg2 but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 push result"
+    assert ($result.0.path == "/nix/store/abc-pkg1") $"Expected correct path"
   }
 }

@@ -1,234 +1,353 @@
 # CI Module - Nix Operations
 
-Nix flake and cache management operations.
+Pipeline-friendly Nix flake and cache management operations.
+
+## Philosophy
+
+All commands are designed for **pipeline composition**:
+- Accept input from stdin (list of flake paths or store paths)
+- Output structured tables for filtering
+- Default to current directory `["."]` if no input provided
+- Continue on failures, report status in output table
 
 ## Requirements
 
 - Nix with flakes enabled
 
-## Flake Commands
+## Commands
 
-### `ci nix flake check`
+### `ci nix check`
 
-Check flake for issues.
+Check flakes for issues.
 
-**Usage:**
-```nu
-ci nix flake check [--flake <path>]
+**Input:**
+- `list<string>` - List of flake paths
+- `string` - Single flake path
+- `nothing` - Defaults to `["."]`
+
+**Output Table:**
+```
+┌───────┬─────────┬───────┐
+│ flake │ status  │ error │
+├───────┼─────────┼───────┤
+│ .     │ success │ null  │
+└───────┴─────────┴───────┘
 ```
 
-**Options:**
-- `--flake` - Path to flake (default: current directory)
-
-**Example:**
+**Examples:**
 ```nu
-ci nix flake check
-ci nix flake check --flake ../myflake
-ci nix flake check --flake /path/to/flake
+# Check single flake (current directory)
+ci nix check
+
+# Check specific flake
+"../myflake" | ci nix check
+
+# Check multiple flakes
+["." "../backend" "../frontend"] | ci nix check
+
+# Filter failures
+["." "../backend"] | ci nix check | where status == "failed"
 ```
 
 ---
 
-### `ci nix flake update`
+### `ci nix update`
 
 Update flake inputs.
 
-**Usage:**
-```nu
-ci nix flake update [input] [--flake <path>]
+**Input:**
+- `list<string>` - List of flake paths
+- `string` - Single flake path
+- `nothing` - Defaults to `["."]`
+
+**Args:**
+- `[input]` - Specific input to update (optional, updates all if omitted)
+
+**Output Table:**
+```
+┌───────┬─────────┬─────────┬───────┐
+│ flake │ input   │ status  │ error │
+├───────┼─────────┼─────────┼───────┤
+│ .     │ nixpkgs │ success │ null  │
+└───────┴─────────┴─────────┴───────┘
 ```
 
-**Positional:**
-- `input` - Specific input to update (optional, updates all if omitted)
-
-**Options:**
-- `--flake` - Path to flake (default: current directory)
-
-**Example:**
+**Examples:**
 ```nu
-# Update all inputs
-ci nix flake update
+# Update all inputs in current flake
+ci nix update
 
 # Update specific input
-ci nix flake update nixpkgs
-ci nix flake update home-manager
+ci nix update nixpkgs
+
+# Update multiple flakes
+["." "../backend"] | ci nix update
+
+# Update specific input in multiple flakes
+["." "../backend"] | ci nix update nixpkgs
+
+# Check which updates failed
+["." "../backend"] | ci nix update | where status == "failed"
 ```
 
 ---
 
-### `ci nix flake show`
+### `ci nix packages`
 
-Show flake outputs in YAML format.
+List packages from flakes.
 
-**Usage:**
-```nu
-ci nix flake show [--flake <path>]
+**Input:**
+- `list<string>` - List of flake paths
+- `string` - Single flake path
+- `nothing` - Defaults to `["."]`
+
+**Output Table:**
+```
+┌───────┬──────────┬───────────────┐
+│ flake │ name     │ system        │
+├───────┼──────────┼───────────────┤
+│ .     │ myapp    │ x86_64-linux  │
+│ .     │ frontend │ x86_64-linux  │
+└───────┴──────────┴───────────────┘
 ```
 
-**Options:**
-- `--flake` - Path to flake (default: current directory)
-
-**Example:**
+**Examples:**
 ```nu
-ci nix flake show
-ci nix flake show --flake ../myflake
+# List packages in current flake
+ci nix packages
+
+# List packages in multiple flakes
+["." "../backend"] | ci nix packages
+
+# Filter by system
+ci nix packages | where system == "aarch64-darwin"
+
+# Get package names only
+ci nix packages | get name
+
+# Find packages across multiple flakes
+["." "../backend" "../frontend"] | ci nix packages | where name =~ "web"
 ```
 
 ---
 
-### `ci nix flake list-packages`
+### `ci nix build`
 
-List all buildable packages in the flake.
+Build packages from flakes.
 
-**Usage:**
+**Input:**
+- `list<string>` - List of flake paths
+- `string` - Single flake path
+- `nothing` - Defaults to `["."]`
+
+**Args:**
+- `[...packages]` - Specific packages to build (optional, builds all if omitted)
+
+**Output Table:**
+```
+┌───────┬─────────┬──────────────┬────────────────────┬─────────┬───────┐
+│ flake │ package │ system       │ path               │ status  │ error │
+├───────┼─────────┼──────────────┼────────────────────┼─────────┼───────┤
+│ .     │ myapp   │ x86_64-linux │ /nix/store/abc-... │ success │ null  │
+└───────┴─────────┴──────────────┴────────────────────┴─────────┴───────┘
+```
+
+**Examples:**
 ```nu
-ci nix flake list-packages [--flake <path>]
-```
+# Build all packages in current flake
+ci nix build
 
-**Options:**
-- `--flake` - Path to flake (default: current directory)
-
-**Output:**
-```
-x86_64-linux:
-  - package1
-  - package2
-
-aarch64-darwin:
-  - package1
-```
-
-**Example:**
-```nu
-ci nix flake list-packages
-ci nix flake list-packages --flake ../myflake
-```
-
----
-
-### `ci nix flake build`
-
-Build flake packages.
-
-**Usage:**
-```nu
-ci nix flake build [package] [--flake <path>]
-```
-
-**Positional:**
-- `package` - Specific package to build (optional, builds all if omitted)
-
-**Options:**
-- `--flake` - Path to flake (default: current directory)
-
-**Features:**
-- Auto-detects current system (Darwin/Linux, aarch64/x86_64)
-- Builds all packages for current system when no package specified
-- Returns store paths
-
-**Example:**
-```nu
 # Build specific package
-ci nix flake build mypackage
+ci nix build myapp
 
-# Build all packages for current system
-ci nix flake build
+# Build multiple specific packages
+ci nix build myapp frontend api
 
-# Build from different flake
-ci nix flake build mypackage --flake ../otherflake
+# Build from multiple flakes
+["." "../backend"] | ci nix build
+
+# Build specific packages from multiple flakes
+["." "../backend"] | ci nix build web-ui api
+
+# Get successful build paths
+ci nix build | where status == "success" | get path
+
+# Show only failures
+ci nix build | where status == "failed" | select package error
 ```
 
-## Cache Commands
+---
 
 ### `ci nix cache push`
 
 Push store paths to binary cache.
 
-**Usage:**
-```nu
-ci nix cache push <paths...> --cache <uri>
+**Input:**
+- `list<string>` - List of Nix store paths (required)
+
+**Flags:**
+- `--cache <uri>` - Cache URI (required)
+
+**Output Table:**
+```
+┌────────────────────┬──────────┬─────────┬───────┐
+│ path               │ cache    │ status  │ error │
+├────────────────────┼──────────┼─────────┼───────┤
+│ /nix/store/abc-... │ cachix   │ success │ null  │
+└────────────────────┴──────────┴─────────┴───────┘
 ```
 
-**Positional:**
-- `paths...` - One or more Nix store paths to push
-
-**Options:**
-- `--cache` - Cache URI (required)
-
 **Cache URI Formats:**
+- Cachix: `cachix` (uses default cachix config)
 - S3: `s3://bucket-name`
 - File: `file:///path/to/cache`
 - HTTP: `https://cache.example.com`
 
-**Example:**
+**Examples:**
 ```nu
-# Push single path to S3
-ci nix cache push /nix/store/abc-pkg --cache s3://mybucket
+# Push specific paths
+["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache push --cache cachix
 
-# Push multiple paths
-ci nix cache push /nix/store/abc /nix/store/def --cache s3://mybucket
+# Pipeline: build and push successful builds
+ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
 
-# Push to file cache
-ci nix cache push /nix/store/pkg --cache file:///var/cache/nix
+# Push to S3
+ci nix build myapp | get path | ci nix cache push --cache s3://mybucket
 
-# Push build output
-let path = (ci nix flake build mypackage | last)
-ci nix cache push $path --cache s3://mybucket
+# Check push results
+ci nix build | get path | ci nix cache push --cache cachix | where status == "failed"
 ```
 
-## Workflow Examples
+## Pipeline Patterns
 
-### Build and Push to Cache
+### Build → Filter → Push
 
 ```nu
-# Build all packages
-ci nix flake build
+# Build all, push only successful builds
+ci nix build 
+  | where status == "success" 
+  | get path 
+  | ci nix cache push --cache cachix
 
-# Build and push specific package
-let path = (ci nix flake build mypackage | last)
-ci nix cache push $path --cache s3://mybucket
+# Build specific packages, push to multiple caches
+ci nix build web api
+  | where status == "success"
+  | get path
+  | tee { ci nix cache push --cache cachix }
+  | ci nix cache push --cache s3://backup
 ```
 
-### Update and Verify Flake
+### Multi-Flake Operations
 
 ```nu
-# Update all inputs
-ci nix flake update
+# Check multiple flakes, show failures
+["." "../backend" "../frontend"] 
+  | ci nix check 
+  | where status == "failed"
 
-# Check for issues
-ci nix flake check
+# Update and check multiple flakes
+["." "../backend"]
+  | ci nix update nixpkgs
+  | get flake
+  | ci nix check
 
-# List what's buildable
-ci nix flake list-packages
-
-# Build to verify
-ci nix flake build
+# List all packages across flakes
+["." "../backend" "../frontend"]
+  | ci nix packages
+  | group-by system
 ```
 
-### Cross-Flake Operations
+### Complex Workflows
 
 ```nu
-# Check multiple flakes
-ci nix flake check --flake ./backend
-ci nix flake check --flake ./frontend
+# Update → Check → Build → Push
+def deploy-all [] {
+  let flakes = ["." "../backend" "../frontend"]
+  
+  # Update all flakes
+  $flakes | ci nix update
+  
+  # Check all flakes
+  let check_results = ($flakes | ci nix check)
+  
+  # Only build flakes that passed checks
+  $check_results 
+    | where status == "success"
+    | get flake
+    | ci nix build
+    | where status == "success"
+    | get path
+    | ci nix cache push --cache cachix
+}
 
-# Update specific input in multiple flakes
-ci nix flake update nixpkgs --flake ./backend
-ci nix flake update nixpkgs --flake ./frontend
+# Conditional build based on package discovery
+def build-web-packages [] {
+  ci nix packages
+    | where name =~ "web"
+    | get name
+    | each {|pkg| ci nix build $pkg}
+    | flatten
+    | where status == "success"
+}
+```
+
+### Filtering and Selection
+
+```nu
+# Build only for specific system
+ci nix packages
+  | where system == "aarch64-darwin"
+  | get name
+  | ci nix build
+
+# Get build paths as list
+let paths = (ci nix build | where status == "success" | get path)
+
+# Show build summary
+ci nix build
+  | group-by status
+  | transpose status count
 ```
 
 ## System Detection
 
-The module automatically detects your system:
+The module automatically detects your system architecture:
 
-| OS | Architecture | Nix System |
-|----|--------------|------------|
-| macOS | ARM64 | aarch64-darwin |
-| macOS | x86_64 | x86_64-darwin |
-| Linux | ARM64 | aarch64-linux |
-| Linux | x86_64 | x86_64-linux |
+| OS    | Architecture | Nix System       |
+|-------|--------------|------------------|
+| macOS | ARM64        | aarch64-darwin   |
+| macOS | x86_64       | x86_64-darwin    |
+| Linux | ARM64        | aarch64-linux    |
+| Linux | x86_64       | x86_64-linux     |
 
-When building all packages, it builds only for your current system.
+**Fallback Behavior:**
+- If system detection fails, uses first available system from flake
+- Logs warning when using fallback
+- Particularly useful in test/CI environments
+
+## Error Handling
+
+All commands follow consistent error handling:
+
+1. **Continue on Failure**: Processing continues for remaining items
+2. **Status in Output**: Each result includes `status` field (`success`/`failed`)
+3. **Error Details**: Failed results include `error` field with message
+4. **Filter Results**: Use `where status == "failed"` to inspect failures
+
+**Examples:**
+```nu
+# See all errors
+ci nix build | where status == "failed" | select package error
+
+# Count failures
+ci nix build | where status == "failed" | length
+
+# Retry failures
+ci nix build 
+  | where status == "failed" 
+  | get package 
+  | ci nix build
+```
 
 ## Logging
 
@@ -236,14 +355,36 @@ Uses `std/log` for operation logging:
 
 ```nu
 $env.NU_LOG_LEVEL = "DEBUG"  # All operations
-$env.NU_LOG_LEVEL = "INFO"   # Important steps
+$env.NU_LOG_LEVEL = "INFO"   # Important steps (default)
+$env.NU_LOG_LEVEL = "WARN"   # Warnings only
 $env.NU_LOG_LEVEL = "ERROR"  # Errors only
 ```
 
-## Error Handling
+## Best Practices
 
-- Validates flake exists
-- Checks cache URI provided
-- Handles Nix errors gracefully
-- Provides clear error messages
-- Shows which operations failed
+1. **Use pipelines for composition:**
+   ```nu
+   ci nix check | get flake | ci nix build
+   ```
+
+2. **Filter early, act on success:**
+   ```nu
+   ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+   ```
+
+3. **Operate on multiple flakes at once:**
+   ```nu
+   ["." "../backend"] | ci nix update | ci nix check | ci nix build
+   ```
+
+4. **Inspect failures:**
+   ```nu
+   ci nix build | where status == "failed" | select package error
+   ```
+
+5. **Save intermediate results:**
+   ```nu
+   let results = (ci nix build)
+   $results | where status == "success" | get path | save successful_paths.txt
+   $results | where status == "failed" | save failures.json
+   ```
