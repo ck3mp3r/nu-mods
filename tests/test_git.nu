@@ -1,5 +1,3 @@
-#!/usr/bin/env nu
-
 # Test git.nu EXPORTED functions with mocked external commands
 # Focus: Test the public API, validate parameters pass through correctly
 

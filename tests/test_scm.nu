@@ -1,5 +1,3 @@
-#!/usr/bin/env nu
-
 # Test ci/scm.nu with mocked git commands
 # Focus: Test branch creation with different flow types and ticket IDs
 

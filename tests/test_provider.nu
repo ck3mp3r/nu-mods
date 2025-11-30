@@ -1,5 +1,3 @@
-#!/usr/bin/env nu
-
 # Test provider.nu with mocked opencode
 
 use std/assert

@@ -1,5 +1,3 @@
-#!/usr/bin/env nu
-
 # Mock wrapper functions for external commands
 # These check for NU_TEST_MODE and use MOCK_* environment variables
 

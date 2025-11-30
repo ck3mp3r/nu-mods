@@ -1,5 +1,3 @@
-#!/usr/bin/env nu
-
 # Test ci/github.nu with mocked gh commands
 # Focus: Test PR and workflow operations
 
