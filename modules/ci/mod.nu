@@ -17,3 +17,6 @@ export def main [] {
 
 # Re-export all scm commands from scm.nu
 export use ./scm.nu *
+
+# Re-export all github commands from github.nu
+export use ./github.nu *
