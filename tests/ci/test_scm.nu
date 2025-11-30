@@ -2,8 +2,8 @@
 # Focus: Test branch creation with different flow types and ticket IDs
 
 use std/assert
-use mocks.nu *
-use ../modules/ci/scm.nu *
+use ../mocks.nu *
+use ../../modules/ci/scm.nu *
 
 # Test 1: Feature branch with ticket ID from stdin
 export def "test ci scm branch feature with ticket from stdin" [] {

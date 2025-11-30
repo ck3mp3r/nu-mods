@@ -2,8 +2,8 @@
 # Focus: Test PR and workflow operations
 
 use std/assert
-use mocks.nu *
-use ../modules/ci/github.nu *
+use ../mocks.nu *
+use ../../modules/ci/github.nu *
 
 # ============================================================================
 # PR TESTS

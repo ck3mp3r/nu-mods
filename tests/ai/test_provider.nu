@@ -1,8 +1,8 @@
 # Test provider.nu with mocked opencode
 
 use std/assert
-use mocks.nu *
-use ../modules/ai/provider.nu *
+use ../mocks.nu *
+use ../../modules/ai/provider.nu *
 
 # Test provider run with valid response
 export def "test provider run with valid response" [] {
