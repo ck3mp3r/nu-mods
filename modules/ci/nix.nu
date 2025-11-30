@@ -50,7 +50,10 @@ def detect-system []: [nothing -> string] {
 # ============================================================================
 
 # Check flakes for issues (pipeline-friendly)
-export def "ci nix check" []: [
+export def "ci nix check" [
+  --impure # Allow impure evaluation
+  --args: list<string> = [] # Additional arguments to pass to nix flake check
+]: [
   list<string> -> table
   string -> table
   nothing -> table
@@ -63,11 +66,21 @@ export def "ci nix check" []: [
     log info $"Checking: ($flake)"
 
     let result = try {
+      mut cmd_args = []
+
       if $flake != "." {
-        nix flake check --flake $flake
-      } else {
-        nix flake check
+        $cmd_args = ($cmd_args | append ["--flake" $flake])
       }
+
+      if $impure {
+        $cmd_args = ($cmd_args | append "--impure")
+      }
+
+      if ($args | is-not-empty) {
+        $cmd_args = ($cmd_args | append $args)
+      }
+
+      nix flake check ...$cmd_args
       {flake: $flake status: "success" error: null}
     } catch {|err|
       log error $"Check failed for ($flake): ($err.msg)"
@@ -188,6 +201,8 @@ export def "ci nix packages" []: [
 # Build packages from flakes (pipeline-friendly)
 export def "ci nix build" [
   ...packages: string # Package names to build (optional - builds all if not provided)
+  --impure # Allow impure evaluation
+  --args: list<string> = [] # Additional arguments to pass to nix build
 ]: [
   list<string> -> table
   string -> table
@@ -236,11 +251,19 @@ export def "ci nix build" [
             log info $"Building ($pkg) from ($flake)"
 
             try {
-              let path = if $flake == "." {
-                nix build $".#($pkg)" --print-out-paths --no-link | str trim
-              } else {
-                nix build $"($flake)#($pkg)" --print-out-paths --no-link | str trim
+              mut cmd_args = []
+              let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
+              $cmd_args = ($cmd_args | append [$target "--print-out-paths" "--no-link"])
+
+              if $impure {
+                $cmd_args = ($cmd_args | append "--impure")
               }
+
+              if ($args | is-not-empty) {
+                $cmd_args = ($cmd_args | append $args)
+              }
+
+              let path = (nix build ...$cmd_args | str trim)
 
               {
                 flake: $flake
@@ -273,11 +296,19 @@ export def "ci nix build" [
         log info $"Building ($pkg) from ($flake)"
 
         try {
-          let path = if $flake == "." {
-            nix build $".#($pkg)" --print-out-paths --no-link | str trim
-          } else {
-            nix build $"($flake)#($pkg)" --print-out-paths --no-link | str trim
+          mut cmd_args = []
+          let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
+          $cmd_args = ($cmd_args | append [$target "--print-out-paths" "--no-link"])
+
+          if $impure {
+            $cmd_args = ($cmd_args | append "--impure")
           }
+
+          if ($args | is-not-empty) {
+            $cmd_args = ($cmd_args | append $args)
+          }
+
+          let path = (nix build ...$cmd_args | str trim)
 
           {
             flake: $flake
@@ -307,13 +338,8 @@ export def "ci nix build" [
 # CACHE COMMANDS
 # ============================================================================
 
-# Nix cache operations - show help
-export def "ci nix cache" [] {
-  show-help "ci nix cache"
-}
-
 # Push store paths to binary cache (pipeline-friendly)
-export def "ci nix cache push" [
+export def "ci nix cache" [
   --cache: string # Cache URI (e.g., s3://bucket, cachix, file:///path)
 ]: [
   list<string> -> table

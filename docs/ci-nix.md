@@ -25,6 +25,10 @@ Check flakes for issues.
 - `string` - Single flake path
 - `nothing` - Defaults to `["."]`
 
+**Flags:**
+- `--impure` - Allow impure evaluation
+- `--args <list>` - Additional arguments to pass to nix flake check
+
 **Output Table:**
 ```
 ┌───────┬─────────┬───────┐
@@ -44,6 +48,12 @@ ci nix check
 
 # Check multiple flakes
 ["." "../backend" "../frontend"] | ci nix check
+
+# Check with impure evaluation
+ci nix check --impure
+
+# Check with additional arguments
+ci nix check --args ["--verbose" "--option" "cores" "4"]
 
 # Filter failures
 ["." "../backend"] | ci nix check | where status == "failed"
@@ -143,6 +153,10 @@ Build packages from flakes.
 **Args:**
 - `[...packages]` - Specific packages to build (optional, builds all if omitted)
 
+**Flags:**
+- `--impure` - Allow impure evaluation
+- `--args <list>` - Additional arguments to pass to nix build
+
 **Output Table:**
 ```
 ┌───────┬─────────┬──────────────┬────────────────────┬─────────┬───────┐
@@ -163,6 +177,12 @@ ci nix build myapp
 # Build multiple specific packages
 ci nix build myapp frontend api
 
+# Build with impure evaluation
+ci nix build myapp --impure
+
+# Build with additional arguments
+ci nix build myapp --args ["--option" "cores" "8"]
+
 # Build from multiple flakes
 ["." "../backend"] | ci nix build
 
@@ -178,7 +198,7 @@ ci nix build | where status == "failed" | select package error
 
 ---
 
-### `ci nix cache push`
+### `ci nix cache`
 
 Push store paths to binary cache.
 
@@ -206,16 +226,16 @@ Push store paths to binary cache.
 **Examples:**
 ```nu
 # Push specific paths
-["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache push --cache cachix
+["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache --cache cachix
 
 # Pipeline: build and push successful builds
-ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 
 # Push to S3
-ci nix build myapp | get path | ci nix cache push --cache s3://mybucket
+ci nix build myapp | get path | ci nix cache --cache s3://mybucket
 
 # Check push results
-ci nix build | get path | ci nix cache push --cache cachix | where status == "failed"
+ci nix build | get path | ci nix cache --cache cachix | where status == "failed"
 ```
 
 ## Pipeline Patterns
@@ -227,14 +247,14 @@ ci nix build | get path | ci nix cache push --cache cachix | where status == "fa
 ci nix build 
   | where status == "success" 
   | get path 
-  | ci nix cache push --cache cachix
+  | ci nix cache --cache cachix
 
 # Build specific packages, push to multiple caches
 ci nix build web api
   | where status == "success"
   | get path
-  | tee { ci nix cache push --cache cachix }
-  | ci nix cache push --cache s3://backup
+  | tee { ci nix cache --cache cachix }
+  | ci nix cache --cache s3://backup
 ```
 
 ### Multi-Flake Operations
@@ -277,7 +297,7 @@ def deploy-all [] {
     | ci nix build
     | where status == "success"
     | get path
-    | ci nix cache push --cache cachix
+    | ci nix cache --cache cachix
 }
 
 # Conditional build based on package discovery
@@ -369,7 +389,7 @@ $env.NU_LOG_LEVEL = "ERROR"  # Errors only
 
 2. **Filter early, act on success:**
    ```nu
-   ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+   ci nix build | where status == "success" | get path | ci nix cache --cache cachix
    ```
 
 3. **Operate on multiple flakes at once:**

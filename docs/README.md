@@ -35,7 +35,7 @@ use ci
 ai git commit
 ci scm branch "add feature" --feature
 ci github pr create "feat: add" "description"
-ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 ```
 
 ## Development

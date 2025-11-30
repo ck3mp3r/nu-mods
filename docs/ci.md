@@ -41,7 +41,7 @@ Pipeline-friendly flake and cache management.
 **Quick Example:**
 ```nu
 # Pipeline composition
-ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 
 # Multi-flake operations
 ["." "../backend"] | ci nix check | ci nix update | ci nix build
@@ -60,7 +60,7 @@ ci nix check
 let build_results = (ci nix build)
 
 # 3. Push successful builds to cache
-$build_results | where status == "success" | get path | ci nix cache push --cache s3://mybucket
+$build_results | where status == "success" | get path | ci nix cache --cache s3://mybucket
 
 # 4. Create PR
 ci github pr create "feat: add authentication" "Implements user auth" --target main
@@ -97,7 +97,7 @@ ci scm branch "v2.1.0" --release --from develop
 ci nix update
 
 # 3. Build all packages and push to cache
-ci nix build | where status == "success" | get path | ci nix cache push --cache s3://releases
+ci nix build | where status == "success" | get path | ci nix cache --cache s3://releases
 
 # 5. Create release PR
 ci github pr create "release: v2.1.0" "Release notes..." --target main
@@ -124,7 +124,7 @@ ci github pr create "release: v2.1.0" "Release notes..." --target main
 ```nu
 # Create branch and build in one flow
 "TICKET-123" | ci scm branch "new feature" --feature
-ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 ci github pr create "feat: new feature" "Description"
 ```
 
@@ -140,7 +140,7 @@ ci nix update
   | ci nix build
   | where status == "success"
   | get path
-  | ci nix cache push --cache cachix
+  | ci nix cache --cache cachix
 ```
 
 ### List → View → Logs
@@ -166,7 +166,7 @@ ci github workflow logs 12345
 
 3. **Use pipelines for build → push:**
    ```nu
-   ci nix build | where status == "success" | get path | ci nix cache push --cache cachix
+   ci nix build | where status == "success" | get path | ci nix cache --cache cachix
    ```
 
 4. **Monitor workflows after PR:**

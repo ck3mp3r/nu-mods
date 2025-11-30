@@ -139,17 +139,15 @@ ci github workflow logs 12345
 ci github workflow cancel 12345
 ci github workflow rerun 12345
 
-# Nix operations
-ci nix flake check
-ci nix flake check --flake ../myflake
-ci nix flake update
-ci nix flake update nixpkgs
-ci nix flake show
-ci nix flake list-packages
-ci nix flake build
-ci nix flake build mypackage
-ci nix cache push /nix/store/abc-pkg --cache s3://mybucket
-ci nix cache push /nix/store/abc /nix/store/def --cache file:///cache
+# Nix operations (pipeline-friendly)
+ci nix check
+ci nix check --impure
+ci nix update nixpkgs
+ci nix packages
+ci nix build
+ci nix build mypackage --impure
+ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+["." "../backend"] | ci nix build | ci nix cache --cache s3://bucket
 ```
 
 ## Development

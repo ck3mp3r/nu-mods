@@ -271,7 +271,7 @@ export def "test ci nix cache push single path" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache push --cache cachix | to json
+['/nix/store/abc-pkg'] | ci nix cache --cache cachix | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -292,7 +292,7 @@ export def "test ci nix cache push multiple paths" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc' '/nix/store/def'] | ci nix cache push --cache 's3://bucket' | to json
+['/nix/store/abc' '/nix/store/def'] | ci nix cache --cache 's3://bucket' | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -313,12 +313,89 @@ export def "test ci nix build and push pipeline" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix build pkg1 | where status == 'success' | get path | ci nix cache push --cache cachix | to json
+ci nix build pkg1 | where status == 'success' | get path | ci nix cache --cache cachix | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
     assert (($result | length) == 1) $"Expected 1 push result"
     assert ($result.0.path == "/nix/store/abc-pkg1") $"Expected correct path"
+  }
+}
+
+# ============================================================================
+# IMPURE AND ARGS FLAGS TESTS
+# ============================================================================
+
+# Test 16: Check with --impure flag
+export def "test ci nix check with impure" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_check_--impure": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix check --impure | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.0.status == "success") $"Expected success with --impure"
+  }
+}
+
+# Test 17: Check with --args
+export def "test ci nix check with args" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_flake_check_--verbose_--option_--cores_4": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix check --args ['--verbose' '--option' '--cores' '4'] | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.0.status == "success") $"Expected success with --args"
+  }
+}
+
+# Test 18: Build with --impure flag
+export def "test ci nix build with impure" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--impure": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix build mypackage --impure | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.0.status == "success") $"Expected success with --impure"
+    assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
+  }
+}
+
+# Test 19: Build with --args
+export def "test ci nix build with args" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--option_cores_8": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+ci nix build mypackage --args ['--option' 'cores' '8'] | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.0.status == "success") $"Expected success with --args"
   }
 }
