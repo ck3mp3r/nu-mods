@@ -115,3 +115,23 @@ export def --wrapped input [...rest] {
     ^input ...$rest
   }
 }
+
+# Mock nix command - returns just the output string
+export def --wrapped nix [...rest] {
+  if ($env.NU_TEST_MODE? | default false) == "true" {
+    let args = ($rest | str join "_" | str replace --all " " "_" | str replace --all "/" "_")
+    let mock_var = $"MOCK_nix_($args)"
+
+    if $mock_var in $env {
+      let mock_data = ($env | get $mock_var | from json)
+      if $mock_data.exit_code != 0 {
+        error make {msg: $"Nix error: ($mock_data.output)"}
+      }
+      $mock_data.output
+    } else {
+      error make {msg: $"Mock not found: ($mock_var)"}
+    }
+  } else {
+    ^nix ...$rest
+  }
+}

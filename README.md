@@ -85,6 +85,16 @@ CI/CD utilities for SCM workflows and GitHub operations.
 - `ci github workflow cancel` - Cancel a running workflow
 - `ci github workflow rerun` - Re-run a workflow
 
+**Nix Flake Commands**:
+- `ci nix flake check` - Check flake for issues
+- `ci nix flake update` - Update flake inputs (all or specific)
+- `ci nix flake show` - Show flake outputs
+- `ci nix flake list-packages` - List all buildable packages
+- `ci nix flake build` - Build packages (all or specific)
+
+**Nix Cache Commands**:
+- `ci nix cache push` - Push store paths to binary cache
+
 **Features**:
 - Standardized branch naming: `<prefix>/<flow-type>/<description>`
 - Flow types: `--feature`, `--fix`, `--hotfix`, `--release`, `--chore`
@@ -128,6 +138,18 @@ ci github workflow view 12345
 ci github workflow logs 12345
 ci github workflow cancel 12345
 ci github workflow rerun 12345
+
+# Nix operations
+ci nix flake check
+ci nix flake check --flake ../myflake
+ci nix flake update
+ci nix flake update nixpkgs
+ci nix flake show
+ci nix flake list-packages
+ci nix flake build
+ci nix flake build mypackage
+ci nix cache push /nix/store/abc-pkg --cache s3://mybucket
+ci nix cache push /nix/store/abc /nix/store/def --cache file:///cache
 ```
 
 ## Development

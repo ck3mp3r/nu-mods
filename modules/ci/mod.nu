@@ -20,3 +20,6 @@ export use ./scm.nu *
 
 # Re-export all github commands from github.nu
 export use ./github.nu *
+
+# Re-export all nix commands from nix.nu
+export use ./nix.nu *
