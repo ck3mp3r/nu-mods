@@ -16,7 +16,10 @@ export def "ci scm branch" [
   --feature # Create a feature branch (default)
   --from: string = "main" # Base branch to branch from
   --no-checkout # Create but don't checkout
-]: [string -> nothing nothing -> nothing] {
+]: [
+  string -> nothing
+  nothing -> nothing
+] {
 
   # Parse input - prefix can come from stdin or be empty
   let prefix = if ($in | describe) == "string" {
