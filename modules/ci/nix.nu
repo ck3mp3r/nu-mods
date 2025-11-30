@@ -52,7 +52,7 @@ def detect-system []: [nothing -> string] {
 # Check flakes for issues (pipeline-friendly)
 export def "ci nix check" [
   --impure # Allow impure evaluation
-  --args: list<string> = [] # Additional arguments to pass to nix flake check
+  --args: string # Additional arguments to pass to nix flake check (e.g., "--verbose --option cores 4")
 ]: [
   list<string> -> table
   string -> table
@@ -77,7 +77,7 @@ export def "ci nix check" [
       }
 
       if ($args | is-not-empty) {
-        $cmd_args = ($cmd_args | append $args)
+        $cmd_args = ($cmd_args | append ($args | split row " "))
       }
 
       nix flake check ...$cmd_args
@@ -202,7 +202,7 @@ export def "ci nix packages" []: [
 export def "ci nix build" [
   ...packages: string # Package names to build (optional - builds all if not provided)
   --impure # Allow impure evaluation
-  --args: list<string> = [] # Additional arguments to pass to nix build
+  --args: string # Additional arguments to pass to nix build (e.g., "--option cores 8")
 ]: [
   list<string> -> table
   string -> table
@@ -251,16 +251,15 @@ export def "ci nix build" [
             log info $"Building ($pkg) from ($flake)"
 
             try {
-              mut cmd_args = []
               let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-              $cmd_args = ($cmd_args | append [$target "--print-out-paths" "--no-link"])
+              mut cmd_args = [$target "--print-out-paths" "--no-link"]
 
               if $impure {
                 $cmd_args = ($cmd_args | append "--impure")
               }
 
               if ($args | is-not-empty) {
-                $cmd_args = ($cmd_args | append $args)
+                $cmd_args = ($cmd_args | append ($args | split row " "))
               }
 
               let path = (nix build ...$cmd_args | str trim)
@@ -296,16 +295,15 @@ export def "ci nix build" [
         log info $"Building ($pkg) from ($flake)"
 
         try {
-          mut cmd_args = []
           let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-          $cmd_args = ($cmd_args | append [$target "--print-out-paths" "--no-link"])
+          mut cmd_args = [$target "--print-out-paths" "--no-link"]
 
           if $impure {
             $cmd_args = ($cmd_args | append "--impure")
           }
 
           if ($args | is-not-empty) {
-            $cmd_args = ($cmd_args | append $args)
+            $cmd_args = ($cmd_args | append ($args | split row " "))
           }
 
           let path = (nix build ...$cmd_args | str trim)

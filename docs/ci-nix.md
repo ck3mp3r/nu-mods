@@ -27,7 +27,7 @@ Check flakes for issues.
 
 **Flags:**
 - `--impure` - Allow impure evaluation
-- `--args <list>` - Additional arguments to pass to nix flake check
+- `--args <string>` - Additional arguments to pass to nix flake check (e.g., "--verbose --option cores 4")
 
 **Output Table:**
 ```
@@ -53,7 +53,7 @@ ci nix check
 ci nix check --impure
 
 # Check with additional arguments
-ci nix check --args ["--verbose" "--option" "cores" "4"]
+ci nix check --args "--verbose --option cores 4"
 
 # Filter failures
 ["." "../backend"] | ci nix check | where status == "failed"
@@ -155,7 +155,7 @@ Build packages from flakes.
 
 **Flags:**
 - `--impure` - Allow impure evaluation
-- `--args <list>` - Additional arguments to pass to nix build
+- `--args <string>` - Additional arguments to pass to nix build (e.g., "--option cores 8")
 
 **Output Table:**
 ```
@@ -181,7 +181,7 @@ ci nix build myapp frontend api
 ci nix build myapp --impure
 
 # Build with additional arguments
-ci nix build myapp --args ["--option" "cores" "8"]
+ci nix build myapp --args "--option cores 8"
 
 # Build from multiple flakes
 ["." "../backend"] | ci nix build

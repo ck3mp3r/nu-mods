@@ -349,12 +349,12 @@ ci nix check --impure | to json
 export def "test ci nix check with args" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--verbose_--option_--cores_4": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--verbose_--option_cores_4": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix check --args ['--verbose' '--option' '--cores' '4'] | to json
+ci nix check --args '--verbose --option cores 4' | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -391,7 +391,7 @@ export def "test ci nix build with args" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix build mypackage --args ['--option' 'cores' '8'] | to json
+ci nix build mypackage --args '--option cores 8' | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
