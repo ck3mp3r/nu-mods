@@ -471,3 +471,66 @@ use modules/ci/nix.nu *
   # Cleanup
   rm -rf $temp_dir
 }
+
+# Test 23: Filter flakes - handles flake.nix file paths
+export def "test ci nix flakes handles file paths" [] {
+  let temp_dir = (mktemp -d)
+  let flake1 = ($temp_dir | path join "flake1")
+  let flake2 = ($temp_dir | path join "flake2")
+
+  mkdir $flake1
+  mkdir $flake2
+
+  # Create flake.nix in flake directories
+  touch ($flake1 | path join "flake.nix")
+  touch ($flake2 | path join "flake.nix")
+
+  try {
+    # Test with flake.nix file paths instead of directories
+    let flake1_file = ($flake1 | path join "flake.nix")
+    let flake2_file = ($flake2 | path join "flake.nix")
+
+    let test_script = $"
+use modules/ci/nix.nu *
+['($flake1_file)' '($flake2_file)'] | ci nix flakes | to json"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 flakes but got: ($result | length)"
+    assert ($flake1 in $result) $"Expected directory ($flake1) in results, not file path"
+    assert ($flake2 in $result) $"Expected directory ($flake2) in results, not file path"
+  }
+
+  # Cleanup
+  rm -rf $temp_dir
+}
+
+# Test 24: Filter flakes - mixed directory and file paths
+export def "test ci nix flakes mixed paths" [] {
+  let temp_dir = (mktemp -d)
+  let flake1 = ($temp_dir | path join "flake1")
+  let flake2 = ($temp_dir | path join "flake2")
+
+  mkdir $flake1
+  mkdir $flake2
+
+  touch ($flake1 | path join "flake.nix")
+  touch ($flake2 | path join "flake.nix")
+
+  try {
+    let flake2_file = ($flake2 | path join "flake.nix")
+
+    let test_script = $"
+use modules/ci/nix.nu *
+['($flake1)' '($flake2_file)'] | ci nix flakes | to json"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 flakes but got: ($result | length)"
+    assert ($flake1 in $result) $"Expected ($flake1) in results"
+    assert ($flake2 in $result) $"Expected ($flake2) in results (normalized from file path)"
+  }
+
+  # Cleanup
+  rm -rf $temp_dir
+}
