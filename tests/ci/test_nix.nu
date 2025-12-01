@@ -399,3 +399,75 @@ ci nix build mypackage --args '--option cores 8' | to json
     assert ($result.0.status == "success") $"Expected success with --args"
   }
 }
+
+# ============================================================================
+# FLAKES TESTS
+# ============================================================================
+
+# Test 20: Filter flakes - find only flake directories
+export def "test ci nix flakes filters correctly" [] {
+  # Create temp directories
+  let temp_dir = (mktemp -d)
+  let flake1 = ($temp_dir | path join "flake1")
+  let flake2 = ($temp_dir | path join "flake2")
+  let not_flake = ($temp_dir | path join "not_flake")
+
+  mkdir $flake1
+  mkdir $flake2
+  mkdir $not_flake
+
+  # Create flake.nix in flake directories
+  touch ($flake1 | path join "flake.nix")
+  touch ($flake2 | path join "flake.nix")
+
+  try {
+    let test_script = $"
+use modules/ci/nix.nu *
+['($flake1)' '($flake2)' '($not_flake)'] | ci nix flakes | to json"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 flakes but got: ($result | length)"
+    assert ($flake1 in $result) $"Expected ($flake1) in results"
+    assert ($flake2 in $result) $"Expected ($flake2) in results"
+    assert ($not_flake not-in $result) $"Did not expect ($not_flake) in results"
+  }
+
+  # Cleanup
+  rm -rf $temp_dir
+}
+
+# Test 21: Filter flakes - empty list
+export def "test ci nix flakes empty input" [] {
+  let test_script = "
+use modules/ci/nix.nu *
+[] | ci nix flakes | to json
+"
+  let output = (nu -c $test_script)
+  let result = ($output | from json)
+
+  assert (($result | length) == 0) $"Expected 0 flakes but got: ($result | length)"
+}
+
+# Test 22: Filter flakes - all non-flakes
+export def "test ci nix flakes all non-flakes" [] {
+  let temp_dir = (mktemp -d)
+  let dir1 = ($temp_dir | path join "dir1")
+  let dir2 = ($temp_dir | path join "dir2")
+
+  mkdir $dir1
+  mkdir $dir2
+
+  try {
+    let test_script = $"
+use modules/ci/nix.nu *
+['($dir1)' '($dir2)'] | ci nix flakes | to json"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 0) $"Expected 0 flakes but got: ($result | length)"
+  }
+
+  # Cleanup
+  rm -rf $temp_dir
+}

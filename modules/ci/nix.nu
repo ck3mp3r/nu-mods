@@ -46,6 +46,26 @@ def detect-system []: [nothing -> string] {
 }
 
 # ============================================================================
+# FLAKES COMMAND
+# ============================================================================
+
+# Filter paths to only include flake directories (pipeline-friendly)
+export def "ci nix flakes" []: [
+  list<string> -> list<string>
+] {
+  let paths = $in
+
+  $paths | each {|path|
+    let flake_file = ($path | path join "flake.nix")
+    if ($flake_file | path exists) {
+      $path
+    } else {
+      null
+    }
+  } | compact
+}
+
+# ============================================================================
 # CHECK COMMAND
 # ============================================================================
 

@@ -16,6 +16,31 @@ All commands are designed for **pipeline composition**:
 
 ## Commands
 
+### `ci nix flakes`
+
+Filter paths to only include flake directories (containing `flake.nix`).
+
+**Input:**
+- `list<string>` - List of directory paths
+
+**Output:**
+- `list<string>` - List of paths that contain `flake.nix`
+
+**Examples:**
+```nu
+# Filter arbitrary paths to find flakes
+["." "../backend" "../docs" "../frontend"] | ci nix flakes
+# Output: ["." "../backend" "../frontend"]
+
+# Find all subdirectories that are flakes
+ls | where type == "dir" | get name | ci nix flakes
+
+# Chain with other commands
+ls | where type == "dir" | get name | ci nix flakes | ci nix check
+```
+
+---
+
 ### `ci nix check`
 
 Check flakes for issues.
