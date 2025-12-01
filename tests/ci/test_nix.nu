@@ -323,6 +323,70 @@ ci nix build pkg1 | where status == 'success' | get path | ci nix cache --cache 
   }
 }
 
+# Test 16: Check upstream cache (path cached)
+export def "test ci nix cache check upstream cached" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "/nix/store/abc-pkg" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['/nix/store/abc-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --dry-run | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.cached == true) $"Expected path to be cached"
+    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream to be set"
+    assert ($result.0.cache == null) $"Expected no cache push in dry-run"
+  }
+}
+
+# Test 17: Check upstream cache (path not cached)
+export def "test ci nix cache check upstream not cached" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_xyz-pkg": ({output: "" exit_code: 1} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['/nix/store/xyz-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --dry-run | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.cached == false) $"Expected path to not be cached"
+    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream to be set"
+  }
+}
+
+# Test 18: Check upstream and push to target cache
+export def "test ci nix cache check and push" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "" exit_code: 1} | to json)
+    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['/nix/store/abc-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --cache cachix | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.cached == false) $"Expected path not in upstream"
+    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
+    assert ($result.0.cache == "cachix") $"Expected push to cachix"
+    assert ($result.0.status == "success") $"Expected successful push"
+  }
+}
+
 # ============================================================================
 # IMPURE AND ARGS FLAGS TESTS
 # ============================================================================

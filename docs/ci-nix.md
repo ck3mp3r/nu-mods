@@ -225,22 +225,29 @@ ci nix build | where status == "failed" | select package error
 
 ### `ci nix cache`
 
-Push store paths to binary cache.
+Check upstream cache status and/or push store paths to binary cache.
 
 **Input:**
 - `list<string>` - List of Nix store paths (required)
 
 **Flags:**
-- `--cache <uri>` - Cache URI (required)
+- `--cache <uri>` - Target cache URI to push to
+- `--upstream <uri>` - Upstream cache URI to check if paths are already cached
+- `--dry-run` - Skip pushing (only check upstream if provided)
 
 **Output Table:**
 ```
-┌────────────────────┬──────────┬─────────┬───────┐
-│ path               │ cache    │ status  │ error │
-├────────────────────┼──────────┼─────────┼───────┤
-│ /nix/store/abc-... │ cachix   │ success │ null  │
-└────────────────────┴──────────┴─────────┴───────┘
+┌────────────────────┬────────┬─────────────────────────┬──────────┬─────────┬───────┐
+│ path               │ cached │ upstream                │ cache    │ status  │ error │
+├────────────────────┼────────┼─────────────────────────┼──────────┼─────────┼───────┤
+│ /nix/store/abc-... │ false  │ https://cache.nixos.org │ cachix   │ success │ null  │
+└────────────────────┴────────┴─────────────────────────┴──────────┴─────────┴───────┘
 ```
+
+**Fields:**
+- `cached` - `true` if path found in upstream, `false` if not, `null` if no upstream checked
+- `upstream` - Upstream cache URI if `--upstream` provided, else `null`
+- `cache` - Target cache URI if pushed, else `null`
 
 **Cache URI Formats:**
 - Cachix: `cachix` (uses default cachix config)
@@ -252,6 +259,15 @@ Push store paths to binary cache.
 ```nu
 # Push specific paths
 ["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache --cache cachix
+
+# Check if paths exist in upstream cache (dry-run)
+ci nix build | get path | ci nix cache --upstream https://cache.nixos.org --dry-run
+
+# Check upstream and push only if not cached
+ci nix build 
+  | get path 
+  | ci nix cache --upstream https://cache.nixos.org --cache cachix
+  | where cached == false
 
 # Pipeline: build and push successful builds
 ci nix build | where status == "success" | get path | ci nix cache --cache cachix
