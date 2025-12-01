@@ -370,7 +370,7 @@ export def "ci nix build" [
 
 # Check cache status or push store paths to binary cache (pipeline-friendly)
 export def "ci nix cache" [
-  --cache: string # Target cache URI to push to (e.g., s3://bucket, cachix, file:///path)
+  cache: string # Target cache URI to push to (e.g., s3://bucket, cachix, file:///path)
   --upstream: string # Upstream cache URI to check if paths are already cached
   --dry-run # Skip pushing to cache (only check upstream if provided)
 ]: [
@@ -406,19 +406,14 @@ export def "ci nix cache" [
 
     # Push to target cache if not dry-run
     let push_result = if (not $dry_run) {
-      if ($cache | is-empty) {
-        log error "No cache URI provided (use --cache)"
-        {cache: null status: "failed" error: "No cache URI provided"}
-      } else {
-        log info $"Pushing ($path) to ($cache)"
+      log info $"Pushing ($path) to ($cache)"
 
-        try {
-          nix copy --to $cache $path
-          {cache: $cache status: "success" error: null}
-        } catch {|err|
-          log error $"Failed to push ($path): ($err.msg)"
-          {cache: $cache status: "failed" error: $err.msg}
-        }
+      try {
+        nix copy --to $cache $path
+        {cache: $cache status: "success" error: null}
+      } catch {|err|
+        log error $"Failed to push ($path): ($err.msg)"
+        {cache: $cache status: "failed" error: $err.msg}
       }
     } else {
       {cache: null status: "success" error: null}

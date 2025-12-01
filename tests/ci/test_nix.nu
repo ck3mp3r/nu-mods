@@ -271,7 +271,7 @@ export def "test ci nix cache push single path" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache --cache cachix | to json
+['/nix/store/abc-pkg'] | ci nix cache cachix | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -292,7 +292,7 @@ export def "test ci nix cache push multiple paths" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc' '/nix/store/def'] | ci nix cache --cache 's3://bucket' | to json
+['/nix/store/abc' '/nix/store/def'] | ci nix cache 's3://bucket' | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -313,7 +313,7 @@ export def "test ci nix build and push pipeline" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix build pkg1 | where status == 'success' | get path | ci nix cache --cache cachix | to json
+ci nix build pkg1 | where status == 'success' | get path | ci nix cache cachix | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -332,7 +332,7 @@ export def "test ci nix cache check upstream cached" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --dry-run | to json
+['/nix/store/abc-pkg'] | ci nix cache 'https://cache.nixos.org' --upstream 'https://cache.nixos.org' --dry-run | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -353,7 +353,7 @@ export def "test ci nix cache check upstream not cached" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/xyz-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --dry-run | to json
+['/nix/store/xyz-pkg'] | ci nix cache 'https://cache.nixos.org' --upstream 'https://cache.nixos.org' --dry-run | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -374,7 +374,7 @@ export def "test ci nix cache check and push" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache --upstream 'https://cache.nixos.org' --cache cachix | to json
+['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)

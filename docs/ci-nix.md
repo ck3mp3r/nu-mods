@@ -230,8 +230,10 @@ Check upstream cache status and/or push store paths to binary cache.
 **Input:**
 - `list<string>` - List of Nix store paths (required)
 
+**Arguments:**
+- `cache` - Target cache URI to push to (required, e.g., `cachix`, `s3://bucket`)
+
 **Flags:**
-- `--cache <uri>` - Target cache URI to push to
 - `--upstream <uri>` - Upstream cache URI to check if paths are already cached
 - `--dry-run` - Skip pushing (only check upstream if provided)
 
@@ -258,25 +260,25 @@ Check upstream cache status and/or push store paths to binary cache.
 **Examples:**
 ```nu
 # Push specific paths
-["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache --cache cachix
+["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache cachix
 
 # Check if paths exist in upstream cache (dry-run)
-ci nix build | get path | ci nix cache --upstream https://cache.nixos.org --dry-run
+ci nix build | get path | ci nix cache https://cache.nixos.org --upstream https://cache.nixos.org --dry-run
 
 # Check upstream and push only if not cached
 ci nix build 
   | get path 
-  | ci nix cache --upstream https://cache.nixos.org --cache cachix
+  | ci nix cache cachix --upstream https://cache.nixos.org
   | where cached == false
 
 # Pipeline: build and push successful builds
-ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+ci nix build | where status == "success" | get path | ci nix cache cachix
 
 # Push to S3
-ci nix build myapp | get path | ci nix cache --cache s3://mybucket
+ci nix build myapp | get path | ci nix cache s3://mybucket
 
 # Check push results
-ci nix build | get path | ci nix cache --cache cachix | where status == "failed"
+ci nix build | get path | ci nix cache cachix | where status == "failed"
 ```
 
 ## Pipeline Patterns
@@ -288,14 +290,14 @@ ci nix build | get path | ci nix cache --cache cachix | where status == "failed"
 ci nix build 
   | where status == "success" 
   | get path 
-  | ci nix cache --cache cachix
+  | ci nix cache cachix
 
 # Build specific packages, push to multiple caches
 ci nix build web api
   | where status == "success"
   | get path
-  | tee { ci nix cache --cache cachix }
-  | ci nix cache --cache s3://backup
+  | tee { ci nix cache cachix }
+  | ci nix cache s3://backup
 ```
 
 ### Multi-Flake Operations
@@ -338,7 +340,7 @@ def deploy-all [] {
     | ci nix build
     | where status == "success"
     | get path
-    | ci nix cache --cache cachix
+    | ci nix cache cachix
 }
 
 # Conditional build based on package discovery
