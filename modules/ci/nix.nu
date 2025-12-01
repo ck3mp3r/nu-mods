@@ -55,25 +55,9 @@ export def "ci nix flakes" []: [
 ] {
   let paths = $in
 
-  $paths | each {|path|
-    # Handle both directory paths and flake.nix file paths
-    let check_path = if ($path | str ends-with "flake.nix") {
-      $path
-    } else {
-      $path | path join "flake.nix"
-    }
-
-    if ($check_path | path exists) {
-      # Return the directory path, not the flake.nix path
-      if ($path | str ends-with "flake.nix") {
-        $path | path dirname
-      } else {
-        $path
-      }
-    } else {
-      null
-    }
-  } | compact
+  $paths
+  | where {|path| ($path | path exists) and ($path | path type) == "dir" }
+  | where {|dir| ($dir | path join "flake.nix" | path exists) }
 }
 
 # ============================================================================

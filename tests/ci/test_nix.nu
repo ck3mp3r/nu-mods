@@ -472,63 +472,53 @@ use modules/ci/nix.nu *
   rm -rf $temp_dir
 }
 
-# Test 23: Filter flakes - handles flake.nix file paths
-export def "test ci nix flakes handles file paths" [] {
+# Test 23: Filter flakes - file paths are filtered out
+export def "test ci nix flakes filters out file paths" [] {
   let temp_dir = (mktemp -d)
   let flake1 = ($temp_dir | path join "flake1")
-  let flake2 = ($temp_dir | path join "flake2")
 
   mkdir $flake1
-  mkdir $flake2
-
-  # Create flake.nix in flake directories
   touch ($flake1 | path join "flake.nix")
-  touch ($flake2 | path join "flake.nix")
 
   try {
-    # Test with flake.nix file paths instead of directories
+    # File paths should be filtered out, only directories returned
     let flake1_file = ($flake1 | path join "flake.nix")
-    let flake2_file = ($flake2 | path join "flake.nix")
 
     let test_script = $"
 use modules/ci/nix.nu *
-['($flake1_file)' '($flake2_file)'] | ci nix flakes | to json"
+['($flake1)' '($flake1_file)'] | ci nix flakes | to json"
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
-    assert (($result | length) == 2) $"Expected 2 flakes but got: ($result | length)"
-    assert ($flake1 in $result) $"Expected directory ($flake1) in results, not file path"
-    assert ($flake2 in $result) $"Expected directory ($flake2) in results, not file path"
+    assert (($result | length) == 1) $"Expected 1 flake (file paths filtered out) but got: ($result | length)"
+    assert ($flake1 in $result) $"Expected directory ($flake1) in results"
   }
 
   # Cleanup
   rm -rf $temp_dir
 }
 
-# Test 24: Filter flakes - mixed directory and file paths
-export def "test ci nix flakes mixed paths" [] {
+# Test 24: Filter flakes - mixed files, dirs, flakes, non-flakes
+export def "test ci nix flakes mixed everything" [] {
   let temp_dir = (mktemp -d)
-  let flake1 = ($temp_dir | path join "flake1")
-  let flake2 = ($temp_dir | path join "flake2")
+  let flake_dir = ($temp_dir | path join "flake_dir")
+  let non_flake_dir = ($temp_dir | path join "non_flake_dir")
+  let some_file = ($temp_dir | path join "file.txt")
 
-  mkdir $flake1
-  mkdir $flake2
-
-  touch ($flake1 | path join "flake.nix")
-  touch ($flake2 | path join "flake.nix")
+  mkdir $flake_dir
+  mkdir $non_flake_dir
+  touch ($flake_dir | path join "flake.nix")
+  touch $some_file
 
   try {
-    let flake2_file = ($flake2 | path join "flake.nix")
-
     let test_script = $"
 use modules/ci/nix.nu *
-['($flake1)' '($flake2_file)'] | ci nix flakes | to json"
+['($flake_dir)' '($non_flake_dir)' '($some_file)' '/nonexistent/path'] | ci nix flakes | to json"
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
-    assert (($result | length) == 2) $"Expected 2 flakes but got: ($result | length)"
-    assert ($flake1 in $result) $"Expected ($flake1) in results"
-    assert ($flake2 in $result) $"Expected ($flake2) in results (normalized from file path)"
+    assert (($result | length) == 1) $"Expected 1 flake but got: ($result | length)"
+    assert ($flake_dir in $result) $"Expected ($flake_dir) in results"
   }
 
   # Cleanup
