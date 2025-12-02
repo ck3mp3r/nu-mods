@@ -98,10 +98,16 @@ use modules/ci/github.nu *
 'Test content' | ci github summary
 "
   # This should log an error but not crash
-  let output = (nu -c $test_script e>| str join "\n")
+  # Capture both stdout and stderr
+  let result = (do { nu -c $test_script } | complete)
 
-  # The function should return early and log an error about missing env var
-  assert ($output | str contains "GITHUB_STEP_SUMMARY") $"Expected error about missing env var but got: ($output)"
+  # The function should return early - exit code should be 0 (no crash)
+  assert ($result.exit_code == 0) $"Expected function to complete without crashing but got exit code: ($result.exit_code)"
+
+  # Check that error message appears in stderr
+  let stderr = ($result.stderr | str join "\n")
+  let has_error = (($stderr | str contains "GITHUB_STEP_SUMMARY") or ($stderr | str contains "Not in a GitHub Actions environment"))
+  assert $has_error $"Expected error about missing env var but got: ($stderr)"
 }
 
 # ============================================================================
