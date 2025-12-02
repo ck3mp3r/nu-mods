@@ -6,6 +6,105 @@ use ../mocks.nu *
 use ../../modules/ci/github.nu *
 
 # ============================================================================
+# SUMMARY TESTS
+# ============================================================================
+
+# Test: GitHub summary with string input
+export def "test ci github summary with string" [] {
+  let test_file = $"/tmp/nu_test_summary_(random chars).md"
+
+  with-env {
+    GITHUB_STEP_SUMMARY: $test_file
+  } {
+    try {
+      let test_script = $"
+use modules/ci/github.nu *
+'# Test Summary' | ci github summary"
+      nu -c $test_script
+
+      # Verify file was created and contains content
+      assert ($test_file | path exists) "Summary file should exist"
+      let content = (open $test_file)
+      assert ($content | str contains "# Test Summary") $"Expected summary content but got: ($content)"
+    } catch {|e|
+      if ($test_file | path exists) { rm $test_file }
+      error make {msg: $e.msg}
+    }
+
+    # Clean up
+    if ($test_file | path exists) { rm $test_file }
+  }
+}
+
+# Test: GitHub summary with list input
+export def "test ci github summary with list" [] {
+  let test_file = $"/tmp/nu_test_summary_list_(random chars).md"
+
+  with-env {
+    GITHUB_STEP_SUMMARY: $test_file
+  } {
+    try {
+      let test_script = $"
+use modules/ci/github.nu *
+['## Results', '- Item 1', '- Item 2'] | ci github summary"
+      nu -c $test_script
+
+      # Verify file contains all list items
+      let content = (open $test_file)
+      assert ($content | str contains "## Results") $"Expected results header but got: ($content)"
+      assert ($content | str contains "- Item 1") $"Expected item 1 but got: ($content)"
+      assert ($content | str contains "- Item 2") $"Expected item 2 but got: ($content)"
+    } catch {|e|
+      if ($test_file | path exists) { rm $test_file }
+      error make {msg: $e.msg}
+    }
+
+    # Clean up
+    if ($test_file | path exists) { rm $test_file }
+  }
+}
+
+# Test: GitHub summary with newline flag
+export def "test ci github summary with newline flag" [] {
+  let test_file = $"/tmp/nu_test_summary_newline_(random chars).md"
+
+  with-env {
+    GITHUB_STEP_SUMMARY: $test_file
+  } {
+    try {
+      let test_script = $"
+use modules/ci/github.nu *
+['Line 1', 'Line 2'] | ci github summary --newline"
+      nu -c $test_script
+
+      # Verify newlines are present
+      let content = (open $test_file)
+      assert ($content | str contains "Line 1\n") $"Expected newline after Line 1 but got: ($content)"
+      assert ($content | str contains "Line 2\n") $"Expected newline after Line 2 but got: ($content)"
+    } catch {|e|
+      if ($test_file | path exists) { rm $test_file }
+      error make {msg: $e.msg}
+    }
+
+    # Clean up
+    if ($test_file | path exists) { rm $test_file }
+  }
+}
+
+# Test: GitHub summary without GITHUB_STEP_SUMMARY env var
+export def "test ci github summary without env var" [] {
+  let test_script = "
+use modules/ci/github.nu *
+'Test content' | ci github summary
+"
+  # This should log an error but not crash
+  let output = (nu -c $test_script e>| str join "\n")
+
+  # The function should return early and log an error about missing env var
+  assert ($output | str contains "GITHUB_STEP_SUMMARY") $"Expected error about missing env var but got: ($output)"
+}
+
+# ============================================================================
 # PR TESTS
 # ============================================================================
 

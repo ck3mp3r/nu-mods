@@ -6,6 +6,45 @@ export def "ci github" [] {
   show-help "ci github"
 }
 
+# Add content to GitHub Actions step summary
+export def "ci github summary" [
+  --newline (-n) # Add newlines after each line of content
+]: [
+  string -> nothing
+  list<string> -> nothing
+] {
+  let content = $in
+
+  # Check if we're in a GitHub Actions environment
+  let summary_file = $env.GITHUB_STEP_SUMMARY? | default ""
+
+  if ($summary_file | is-empty) {
+    log error "Not in a GitHub Actions environment (GITHUB_STEP_SUMMARY not set)"
+    return
+  }
+
+  # Handle both string and list of strings
+  let lines = if ($content | describe | str starts-with "list") {
+    $content
+  } else {
+    [$content]
+  }
+
+  # Write to summary file
+  try {
+    for line in $lines {
+      if $newline {
+        $"($line)\n" | save --append $summary_file
+      } else {
+        $line | save --append $summary_file
+      }
+    }
+    log info "Added content to GitHub step summary"
+  } catch {|err|
+    log error $"Failed to write to step summary: ($err.msg)"
+  }
+}
+
 # ============================================================================
 # PR COMMANDS
 # ============================================================================
