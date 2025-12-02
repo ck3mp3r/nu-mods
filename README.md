@@ -109,7 +109,7 @@ Once installed, import modules in your Nushell session:
 
 ```nu
 # Import the AI module
-use ai
+use ai *
 
 # Use AI commands
 ai git commit
@@ -117,7 +117,7 @@ ai git create branch --prefix "JIRA-123" --description "Add login feature"
 ai git create pr --target "develop"
 
 # Import the CI module
-use ci
+use ci *
 
 # SCM branch management
 "JIRA-1234" | ci scm branch "add user login" --feature

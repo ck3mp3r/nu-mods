@@ -11,6 +11,7 @@ export def help [...rest] {
 }
 
 # CI utilities for SCM flows
+# NOTE: To use subcommands, import with: use ci *
 export def main [] {
   show-help "ci"
 }

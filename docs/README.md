@@ -28,8 +28,8 @@ const NU_LIB_DIRS = [
 
 ```nu
 # Import modules
-use ai
-use ci
+use ai *
+use ci *
 
 # Use commands
 ai git commit
