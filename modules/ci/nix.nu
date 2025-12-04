@@ -26,21 +26,8 @@ def normalize-flakes []: [list<string> -> list<string> string -> list<string> no
 # Detect current Nix system
 def detect-system []: [nothing -> string] {
   try {
-    let host_info = (sys host)
-    let system = ($host_info | get long_os_version | parse "{name} {version}" | get name.0)
-    let arch = ($host_info | get arch)
-    match [$system $arch] {
-      ["Darwin" "aarch64"] => "aarch64-darwin"
-      ["Darwin" "x86_64"] => "x86_64-darwin"
-      ["Linux" "aarch64"] => "aarch64-linux"
-      ["Linux" "x86_64"] => "x86_64-linux"
-      _ => {
-        $"Unsupported system: ($system) ($arch)" | ci log error
-        "unknown"
-      }
-    }
+    nix eval --impure --expr 'builtins.currentSystem' | str trim | str replace -a '"' ''
   } catch {
-    "Failed to detect system" | ci log error
     "unknown"
   }
 }
@@ -203,7 +190,7 @@ export def "ci nix packages" []: [
         nix flake show $flake --json | from json
       }
 
-      if "packages" in $flake_info {
+      if ($flake_info != null) and ("packages" in $flake_info) {
         let packages = $flake_info.packages
 
         $packages | columns | each {|system|
@@ -260,7 +247,7 @@ export def "ci nix build" [
           nix flake show $flake --json | from json
         }
 
-        if "packages" not-in $flake_info {
+        if ($flake_info == null) or ("packages" not-in $flake_info) {
           $"No packages found in ($flake)" | ci log warning
           []
         } else {
