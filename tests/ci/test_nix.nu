@@ -34,7 +34,7 @@ export def "test ci nix check multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_flake_check": ({output: "" exit_code: 0} | to json)
-    "MOCK_nix_flake_check_--flake_.._backend": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_.._backend": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -160,7 +160,7 @@ export def "test ci nix packages multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{}}}}' exit_code: 0} | to json)
-    "MOCK_nix_flake_show_--flake_.._backend_--json": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_show_.._backend_--json": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *

@@ -100,8 +100,9 @@ export def "ci nix check" [
     let result = try {
       mut cmd_args = []
 
+      # nix flake check takes flake-url as positional argument
       if $flake != "." {
-        $cmd_args = ($cmd_args | append ["--flake" $flake])
+        $cmd_args = ($cmd_args | append $flake)
       }
 
       if $impure {
@@ -199,7 +200,7 @@ export def "ci nix packages" []: [
       let flake_info = if $flake == "." {
         nix flake show --json | from json
       } else {
-        nix flake show --flake $flake --json | from json
+        nix flake show $flake --json | from json
       }
 
       if "packages" in $flake_info {
@@ -256,7 +257,7 @@ export def "ci nix build" [
         let flake_info = if $flake == "." {
           nix flake show --json | from json
         } else {
-          nix flake show --flake $flake --json | from json
+          nix flake show $flake --json | from json
         }
 
         if "packages" not-in $flake_info {
