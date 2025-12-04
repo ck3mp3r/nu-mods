@@ -14,6 +14,20 @@ const DEFAULT_ICONS = {
   critical: "🔥"
 }
 
+# Helper function to format log message with icon
+def format-with-icon [
+  level: string
+  custom_icon?: string
+]: [string -> string] {
+  let msg = $in
+  let icon = if ($custom_icon | is-empty) {
+    $DEFAULT_ICONS | get $level
+  } else {
+    $custom_icon
+  }
+  $" ($icon) ($msg)"
+}
+
 # Log a debug message from piped input
 #
 # Examples:
@@ -22,15 +36,8 @@ const DEFAULT_ICONS = {
 export def "ci log debug" [
   --icon (-i): string # Custom icon to override the default debug icon
 ]: [string -> nothing] {
-  let msg = $in
-
-  let icon = if ($icon | is-empty) {
-    $DEFAULT_ICONS.debug
-  } else {
-    $icon
-  }
-
-  log debug $" ($icon) ($msg)"
+  let formatted = ($in | format-with-icon "debug" $icon)
+  log debug $formatted
 }
 
 # Log an info message from piped input
@@ -41,15 +48,8 @@ export def "ci log debug" [
 export def "ci log info" [
   --icon (-i): string # Custom icon to override the default info icon
 ]: [string -> nothing] {
-  let msg = $in
-
-  let icon = if ($icon | is-empty) {
-    $DEFAULT_ICONS.info
-  } else {
-    $icon
-  }
-
-  log info $" ($icon) ($msg)"
+  let formatted = ($in | format-with-icon "info" $icon)
+  log info $formatted
 }
 
 # Log a warning message from piped input
@@ -60,15 +60,8 @@ export def "ci log info" [
 export def "ci log warning" [
   --icon (-i): string # Custom icon to override the default warning icon
 ]: [string -> nothing] {
-  let msg = $in
-
-  let icon = if ($icon | is-empty) {
-    $DEFAULT_ICONS.warning
-  } else {
-    $icon
-  }
-
-  log warning $" ($icon) ($msg)"
+  let formatted = ($in | format-with-icon "warning" $icon)
+  log warning $formatted
 }
 
 # Log an error message from piped input
@@ -79,15 +72,8 @@ export def "ci log warning" [
 export def "ci log error" [
   --icon (-i): string # Custom icon to override the default error icon
 ]: [string -> nothing] {
-  let msg = $in
-
-  let icon = if ($icon | is-empty) {
-    $DEFAULT_ICONS.error
-  } else {
-    $icon
-  }
-
-  log error $" ($icon) ($msg)"
+  let formatted = ($in | format-with-icon "error" $icon)
+  log error $formatted
 }
 
 # Log a critical message from piped input
@@ -98,13 +84,6 @@ export def "ci log error" [
 export def "ci log critical" [
   --icon (-i): string # Custom icon to override the default critical icon
 ]: [string -> nothing] {
-  let msg = $in
-
-  let icon = if ($icon | is-empty) {
-    $DEFAULT_ICONS.critical
-  } else {
-    $icon
-  }
-
-  log critical $" ($icon) ($msg)"
+  let formatted = ($in | format-with-icon "critical" $icon)
+  log critical $formatted
 }

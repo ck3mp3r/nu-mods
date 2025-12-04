@@ -127,6 +127,7 @@ use modules/ci/nix.nu *
     let result = ($output | from json)
 
     assert (($result | length) == 2) $"Expected 2 results"
+    assert ($result | all {|r| $r.status == "success" }) $"Expected all updates to succeed"
   }
 }
 
@@ -216,6 +217,7 @@ ci nix build mypackage | to json
 
     assert (($result | length) == 1) $"Expected 1 build result"
     assert ($result.0.package == "mypackage") $"Expected mypackage"
+    assert ($result.0.status == "success") $"Expected success"
     assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
   }
 }
@@ -236,6 +238,7 @@ ci nix build pkg1 pkg2 | to json
     let result = ($output | from json)
 
     assert (($result | length) == 2) $"Expected 2 build results"
+    assert ($result | all {|r| $r.status == "success" }) $"Expected all builds to succeed"
   }
 }
 
@@ -244,6 +247,8 @@ export def "test ci nix build multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg2" exit_code: 0} | to json)
+    "MOCK_nix_build_.._backend#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg1" exit_code: 0} | to json)
     "MOCK_nix_build_.._backend#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
   } {
     let test_script = "
@@ -255,6 +260,7 @@ use modules/ci/nix.nu *
     let result = ($output | from json)
 
     assert (($result | length) == 4) $"Expected 4 build results, 2 per flake"
+    assert ($result | all {|r| $r.status == "success" }) $"Expected all builds to succeed but got: ($result | where status != 'success')"
   }
 }
 
