@@ -1,5 +1,5 @@
 use ../common/help show-help
-use std/log
+use log.nu *
 
 # SCM flow operations - show help
 export def "ci scm" [] {
@@ -32,7 +32,7 @@ export def "ci scm branch" [
   let desc = $description | default ""
 
   if $desc == "" {
-    log error "Description is required"
+    "Description is required" | ci log error
     return
   }
 
@@ -40,7 +40,7 @@ export def "ci scm branch" [
   try {
     git status --porcelain | ignore
   } catch {|err|
-    log error "Not in a git repository"
+    "Not in a git repository" | ci log error
     error make {msg: $"Not in a git repository: ($err.msg)"}
   }
 
@@ -73,40 +73,40 @@ export def "ci scm branch" [
 
   # Prepare base branch
   if $current_branch != $from {
-    log info $"Switching to base branch: ($from)"
+    $"Switching to base branch: ($from)" | ci log info
     try {
       git checkout $from
     } catch {|err|
-      log error $"Failed to checkout base branch ($from): ($err.msg)"
+      $"Failed to checkout base branch ($from): ($err.msg)" | ci log error
       return
     }
   }
 
   # Pull latest changes
-  log info $"Updating base branch: ($from)"
+  $"Updating base branch: ($from)" | ci log info
   try {
     git pull
   } catch {|err|
-    log warning $"Failed to pull latest changes: ($err.msg)"
+    $"Failed to pull latest changes: ($err.msg)" | ci log warning
   }
 
   # Create and optionally checkout branch
   if $no_checkout {
-    log info $"Creating branch: ($branch_name) from ($from)"
+    $"Creating branch: ($branch_name) from ($from)" | ci log info
     try {
       git branch $branch_name
       print $"✅ Created branch: ($branch_name) from ($from)"
     } catch {|err|
-      log error $"Failed to create branch: ($err.msg)"
+      $"Failed to create branch: ($err.msg)" | ci log error
       return
     }
   } else {
-    log info $"Creating branch: ($branch_name) from ($from)"
+    $"Creating branch: ($branch_name) from ($from)" | ci log info
     try {
       git checkout -b $branch_name
       print $"✅ Successfully created and switched to branch: ($branch_name) from ($from)"
     } catch {|err|
-      log error $"Failed to create branch: ($err.msg)"
+      $"Failed to create branch: ($err.msg)" | ci log error
       return
     }
   }

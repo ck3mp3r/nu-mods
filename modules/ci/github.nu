@@ -1,5 +1,5 @@
 use ../common/help show-help
-use std/log
+use log.nu *
 
 # GitHub operations - show help
 export def "ci github" [] {
@@ -19,7 +19,7 @@ export def "ci github summary" [
   let summary_file = $env.GITHUB_STEP_SUMMARY? | default ""
 
   if ($summary_file | is-empty) {
-    log error "Not in a GitHub Actions environment (GITHUB_STEP_SUMMARY not set)"
+    "Not in a GitHub Actions environment (GITHUB_STEP_SUMMARY not set)" | ci log error
     return
   }
 
@@ -39,9 +39,9 @@ export def "ci github summary" [
         $line | save --append $summary_file
       }
     }
-    log info "Added content to GitHub step summary"
+    "Added content to GitHub step summary" | ci log info
   } catch {|err|
-    log error $"Failed to write to step summary: ($err.msg)"
+    $"Failed to write to step summary: ($err.msg)" | ci log error
   }
 }
 
@@ -63,11 +63,11 @@ export def "ci github pr check" [
   let current_branch = try {
     git rev-parse --abbrev-ref HEAD | str trim
   } catch {
-    log error "Not in a git repository"
+    "Not in a git repository" | ci log error
     return
   }
 
-  log info $"Checking for existing PRs: ($current_branch) -> ($target)"
+  $"Checking for existing PRs: ($current_branch) -> ($target)" | ci log info
 
   let existing_prs = try {
     gh pr list --head $current_branch --base $target --json number,title,url | str trim
@@ -97,20 +97,20 @@ export def "ci github pr create" [
 ] {
   let body = $description | default ""
 
-  log info $"Creating PR: ($title)"
+  $"Creating PR: ($title)" | ci log info
 
   let result = if $draft {
     try {
       gh pr create --title $title --body $body --base $target --draft
     } catch {|err|
-      log error $"Failed to create draft PR: ($err.msg)"
+      $"Failed to create draft PR: ($err.msg)" | ci log error
       return
     }
   } else {
     try {
       gh pr create --title $title --body $body --base $target
     } catch {|err|
-      log error $"Failed to create PR: ($err.msg)"
+      $"Failed to create PR: ($err.msg)" | ci log error
       return
     }
   }
@@ -134,13 +134,13 @@ export def "ci github pr update" [
 ]: [
   nothing -> nothing
 ] {
-  log info $"Updating PR #($pr_number)"
+  $"Updating PR #($pr_number)" | ci log info
 
   # Get repo info
   let repo = try {
     gh repo view --json owner,name | from json
   } catch {|err|
-    log error $"Failed to get repo info: ($err.msg)"
+    $"Failed to get repo info: ($err.msg)" | ci log error
     return
   }
 
@@ -159,7 +159,7 @@ export def "ci github pr update" [
 
     print $"✓ Updated PR #($pr_number)"
   } catch {|err|
-    log error $"Failed to update PR: ($err.msg)"
+    $"Failed to update PR: ($err.msg)" | ci log error
   }
 }
 
@@ -171,8 +171,7 @@ export def "ci github pr list" [
 ]: [
   nothing -> nothing
 ] {
-  let state_msg = $"Listing PRs \(state: ($state)\)"
-  log info $state_msg
+  $"Listing PRs \(state: ($state)\)" | ci log info
 
   let prs = try {
     if ($author | is-not-empty) {
@@ -181,7 +180,7 @@ export def "ci github pr list" [
       gh pr list --state $state --json number,title,author --limit $limit | from json
     }
   } catch {|err|
-    log error $"Failed to list PRs: ($err.msg)"
+    $"Failed to list PRs: ($err.msg)" | ci log error
     return
   }
 
@@ -210,7 +209,7 @@ export def "ci github workflow list" [
 ]: [
   nothing -> nothing
 ] {
-  log info "Listing workflow runs"
+  "Listing workflow runs" | ci log info
 
   let runs = try {
     if ($status | is-not-empty) {
@@ -219,7 +218,7 @@ export def "ci github workflow list" [
       gh run list --json databaseId,status,conclusion,name,headBranch --limit $limit | from json
     }
   } catch {|err|
-    log error $"Failed to list workflow runs: ($err.msg)"
+    $"Failed to list workflow runs: ($err.msg)" | ci log error
     return
   }
 
@@ -243,12 +242,12 @@ export def "ci github workflow view" [
 ]: [
   nothing -> nothing
 ] {
-  log info $"Viewing workflow run #($run_id)"
+  $"Viewing workflow run #($run_id)" | ci log info
 
   let run = try {
     gh run view $run_id --json databaseId,status,conclusion,name,headBranch,createdAt,jobs | from json
   } catch {|err|
-    log error $"Failed to view workflow run: ($err.msg)"
+    $"Failed to view workflow run: ($err.msg)" | ci log error
     return
   }
 
@@ -277,12 +276,12 @@ export def "ci github workflow logs" [
 ]: [
   nothing -> nothing
 ] {
-  log info $"Fetching logs for workflow run #($run_id)"
+  $"Fetching logs for workflow run #($run_id)" | ci log info
 
   try {
     gh run view $run_id --log
   } catch {|err|
-    log error $"Failed to fetch logs: ($err.msg)"
+    $"Failed to fetch logs: ($err.msg)" | ci log error
   }
 }
 
@@ -292,13 +291,13 @@ export def "ci github workflow cancel" [
 ]: [
   nothing -> nothing
 ] {
-  log info $"Canceling workflow run #($run_id)"
+  $"Canceling workflow run #($run_id)" | ci log info
 
   try {
     gh run cancel $run_id
     print $"✓ Canceled workflow run #($run_id)"
   } catch {|err|
-    log error $"Failed to cancel workflow run: ($err.msg)"
+    $"Failed to cancel workflow run: ($err.msg)" | ci log error
   }
 }
 
@@ -308,12 +307,12 @@ export def "ci github workflow rerun" [
 ]: [
   nothing -> nothing
 ] {
-  log info $"Re-running workflow #($run_id)"
+  $"Re-running workflow #($run_id)" | ci log info
 
   try {
     gh run rerun $run_id
     print $"✓ Re-running workflow #($run_id)"
   } catch {|err|
-    log error $"Failed to rerun workflow: ($err.msg)"
+    $"Failed to rerun workflow: ($err.msg)" | ci log error
   }
 }

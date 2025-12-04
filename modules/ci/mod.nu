@@ -24,3 +24,6 @@ export use ./github.nu *
 
 # Re-export all nix commands from nix.nu
 export use ./nix.nu *
+
+# Re-export all log commands from log.nu
+export use ./log.nu *

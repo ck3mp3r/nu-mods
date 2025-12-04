@@ -1,5 +1,5 @@
 use ../common/help show-help
-use std/log
+use log.nu *
 
 # Nix operations - show help
 export def "ci nix" [] {
@@ -35,12 +35,12 @@ def detect-system []: [nothing -> string] {
       ["Linux" "aarch64"] => "aarch64-linux"
       ["Linux" "x86_64"] => "x86_64-linux"
       _ => {
-        log error $"Unsupported system: ($system) ($arch)"
+        $"Unsupported system: ($system) ($arch)" | ci log error
         "unknown"
       }
     }
   } catch {
-    log error "Failed to detect system"
+    "Failed to detect system" | ci log error
     "unknown"
   }
 }
@@ -92,10 +92,10 @@ export def "ci nix check" [
 ] {
   let flakes = $in | normalize-flakes
 
-  log info $"Checking ($flakes | length) flakes"
+  $"Checking ($flakes | length) flakes" | ci log info
 
   $flakes | each {|flake|
-    log info $"Checking: ($flake)"
+    $"Checking: ($flake)" | ci log info
 
     let result = try {
       mut cmd_args = []
@@ -115,7 +115,7 @@ export def "ci nix check" [
       nix flake check ...$cmd_args
       {flake: $flake status: "success" error: null}
     } catch {|err|
-      log error $"Check failed for ($flake): ($err.msg)"
+      $"Check failed for ($flake): ($err.msg)" | ci log error
       {flake: $flake status: "failed" error: $err.msg}
     }
 
@@ -138,9 +138,9 @@ export def "ci nix update" [
   let flakes = $in | normalize-flakes
 
   if ($input | is-not-empty) {
-    log info $"Updating input '($input)' in ($flakes | length) flakes"
+    $"Updating input '($input)' in ($flakes | length) flakes" | ci log info
   } else {
-    log info $"Updating all inputs in ($flakes | length) flakes"
+    $"Updating all inputs in ($flakes | length) flakes" | ci log info
   }
 
   $flakes | each {|flake|
@@ -148,7 +148,7 @@ export def "ci nix update" [
 
     let result = try {
       if ($input | is-not-empty) {
-        log info $"Updating ($input) in ($flake)"
+        $"Updating ($input) in ($flake)" | ci log info
         if $flake == "." {
           nix flake update $input
         } else {
@@ -156,7 +156,7 @@ export def "ci nix update" [
         }
         {flake: $flake input: $input status: "success" error: null}
       } else {
-        log info $"Updating all inputs in ($flake)"
+        $"Updating all inputs in ($flake)" | ci log info
         if $flake == "." {
           nix flake update
         } else {
@@ -165,7 +165,7 @@ export def "ci nix update" [
         {flake: $flake input: "all" status: "success" error: null}
       }
     } catch {|err|
-      log error $"Update failed for ($flake): ($err.msg)"
+      $"Update failed for ($flake): ($err.msg)" | ci log error
       {
         flake: $flake
         input: (if ($input | is-not-empty) { $input } else { "all" })
@@ -190,10 +190,10 @@ export def "ci nix packages" []: [
 ] {
   let flakes = $in | normalize-flakes
 
-  log info $"Listing packages from ($flakes | length) flakes"
+  $"Listing packages from ($flakes | length) flakes" | ci log info
 
   $flakes | each {|flake|
-    log info $"Listing packages in ($flake)"
+    $"Listing packages in ($flake)" | ci log info
 
     try {
       let flake_info = if $flake == "." {
@@ -220,7 +220,7 @@ export def "ci nix packages" []: [
         []
       }
     } catch {|err|
-      log error $"Failed to list packages for ($flake): ($err.msg)"
+      $"Failed to list packages for ($flake): ($err.msg)" | ci log error
       []
     }
   } | flatten
@@ -245,12 +245,12 @@ export def "ci nix build" [
 
   let packages_to_build = $packages
 
-  log info $"Building from ($flakes | length) flakes"
+  $"Building from ($flakes | length) flakes" | ci log info
 
   $flakes | each {|flake|
     if ($packages_to_build | is-empty) {
       # Build all packages for current system
-      log info $"Building all packages in ($flake)"
+      $"Building all packages in ($flake)" | ci log info
 
       try {
         let flake_info = if $flake == "." {
@@ -260,7 +260,7 @@ export def "ci nix build" [
         }
 
         if "packages" not-in $flake_info {
-          log warning $"No packages found in ($flake)"
+          $"No packages found in ($flake)" | ci log warning
           []
         } else {
           let packages = $flake_info.packages
@@ -270,17 +270,17 @@ export def "ci nix build" [
             $current_system
           } else if $current_system == "unknown" and (($packages | columns | length) > 0) {
             let first_system = ($packages | columns | first)
-            log warning $"System detection failed, using first available system: ($first_system)"
+            $"System detection failed, using first available system: ($first_system)" | ci log warning
             $first_system
           } else {
-            log warning $"No packages for system ($current_system) in ($flake)"
+            $"No packages for system ($current_system) in ($flake)" | ci log warning
             return []
           }
 
           let system_packages = ($packages | get $target_system | columns)
 
           $system_packages | each {|pkg|
-            log info $"Building ($pkg) from ($flake)"
+            $"Building ($pkg) from ($flake)" | ci log info
 
             try {
               let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
@@ -305,7 +305,7 @@ export def "ci nix build" [
                 error: null
               }
             } catch {|err|
-              log error $"Failed to build ($pkg): ($err.msg)"
+              $"Failed to build ($pkg): ($err.msg)" | ci log error
               {
                 flake: $flake
                 package: $pkg
@@ -318,13 +318,13 @@ export def "ci nix build" [
           }
         }
       } catch {|err|
-        log error $"Failed to get flake info for ($flake): ($err.msg)"
+        $"Failed to get flake info for ($flake): ($err.msg)" | ci log error
         []
       }
     } else {
       # Build specific packages
       $packages_to_build | each {|pkg|
-        log info $"Building ($pkg) from ($flake)"
+        $"Building ($pkg) from ($flake)" | ci log info
 
         try {
           let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
@@ -349,7 +349,7 @@ export def "ci nix build" [
             error: null
           }
         } catch {|err|
-          log error $"Failed to build ($pkg): ($err.msg)"
+          $"Failed to build ($pkg): ($err.msg)" | ci log error
           {
             flake: $flake
             package: $pkg
@@ -379,22 +379,22 @@ export def "ci nix cache" [
   let paths = $in
 
   if ($paths | is-empty) {
-    log error "No paths provided"
+    "No paths provided" | ci log error
     return []
   }
 
   $paths | each {|path|
     # Check upstream cache if provided
     let upstream_check = if ($upstream | is-not-empty) {
-      log info $"Checking ($path) in upstream cache ($upstream)"
+      $"Checking ($path) in upstream cache ($upstream)" | ci log info
 
       let is_cached = (
         try {
           nix path-info --store $upstream $path
-          log info $"Path ($path) found in upstream cache"
+          $"Path ($path) found in upstream cache" | ci log info
           true
         } catch {
-          log info $"Path ($path) not found in upstream cache"
+          $"Path ($path) not found in upstream cache" | ci log info
           false
         }
       )
@@ -406,13 +406,13 @@ export def "ci nix cache" [
 
     # Push to target cache if not dry-run
     let push_result = if (not $dry_run) {
-      log info $"Pushing ($path) to ($cache)"
+      $"Pushing ($path) to ($cache)" | ci log info
 
       try {
         nix copy --to $cache $path
         {cache: $cache status: "success" error: null}
       } catch {|err|
-        log error $"Failed to push ($path): ($err.msg)"
+        $"Failed to push ($path): ($err.msg)" | ci log error
         {cache: $cache status: "failed" error: $err.msg}
       }
     } else {
