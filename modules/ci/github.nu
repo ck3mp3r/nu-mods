@@ -45,10 +45,6 @@ export def "ci github summary" [
   }
 }
 
-# ============================================================================
-# PR COMMANDS
-# ============================================================================
-
 # GitHub PR operations - show help
 export def "ci github pr" [] {
   show-help "ci github pr"
@@ -192,10 +188,6 @@ export def "ci github pr list" [
     }
   }
 }
-
-# ============================================================================
-# WORKFLOW COMMANDS
-# ============================================================================
 
 # GitHub workflow operations - show help
 export def "ci github workflow" [] {

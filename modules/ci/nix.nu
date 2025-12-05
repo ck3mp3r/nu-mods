@@ -6,10 +6,6 @@ export def "ci nix" [] {
   show-help "ci nix"
 }
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
 # Normalize input to list of flake paths
 def normalize-flakes []: [list<string> -> list<string> string -> list<string> nothing -> list<string>] {
   let input = $in
@@ -31,10 +27,6 @@ def detect-system []: [nothing -> string] {
     "unknown"
   }
 }
-
-# ============================================================================
-# FLAKES COMMAND
-# ============================================================================
 
 # Filter paths to only include flake directories (pipeline-friendly)
 export def "ci nix flakes" []: [
@@ -63,10 +55,6 @@ export def "ci nix flakes" []: [
     }
   } | compact | uniq
 }
-
-# ============================================================================
-# CHECK COMMAND
-# ============================================================================
 
 # Check flakes for issues (pipeline-friendly)
 export def "ci nix check" [
@@ -110,10 +98,6 @@ export def "ci nix check" [
     $result
   }
 }
-
-# ============================================================================
-# UPDATE COMMAND
-# ============================================================================
 
 # Update flake inputs (pipeline-friendly)
 export def "ci nix update" [
@@ -166,10 +150,6 @@ export def "ci nix update" [
   }
 }
 
-# ============================================================================
-# PACKAGES COMMAND
-# ============================================================================
-
 # List packages from flakes (pipeline-friendly)
 export def "ci nix packages" []: [
   list<string> -> table
@@ -213,10 +193,6 @@ export def "ci nix packages" []: [
     }
   } | flatten
 }
-
-# ============================================================================
-# BUILD COMMAND
-# ============================================================================
 
 # Build packages from flakes (pipeline-friendly)
 export def "ci nix build" [
@@ -351,10 +327,6 @@ export def "ci nix build" [
     }
   } | flatten
 }
-
-# ============================================================================
-# CACHE COMMANDS
-# ============================================================================
 
 # Check cache status or push store paths to binary cache (pipeline-friendly)
 export def "ci nix cache" [
