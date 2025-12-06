@@ -74,8 +74,8 @@ export def "ci scm branch" [
   --from: string = "main" # Base branch to branch from
   --no-checkout # Create but don't checkout
 ]: [
-  string -> nothing
-  nothing -> nothing
+  string -> record
+  nothing -> record
 ] {
 
   # Parse input - prefix can come from stdin or be empty
@@ -90,7 +90,7 @@ export def "ci scm branch" [
 
   if $desc == "" {
     "Description is required" | ci log error
-    return
+    return {status: "error" error: "Description is required" branch: null}
   }
 
   # Verify we're in a git repository
@@ -98,7 +98,7 @@ export def "ci scm branch" [
     git status --porcelain | ignore
   } catch {|err|
     "Not in a git repository" | ci log error
-    error make {msg: $"Not in a git repository: ($err.msg)"}
+    return {status: "error" error: $"Not in a git repository: ($err.msg)" branch: null}
   }
 
   # Determine flow type (default to feature)
@@ -135,7 +135,7 @@ export def "ci scm branch" [
       git checkout $from
     } catch {|err|
       $"Failed to checkout base branch ($from): ($err.msg)" | ci log error
-      return
+      return {status: "error" error: $"Failed to checkout base branch: ($err.msg)" branch: null}
     }
   }
 
@@ -153,18 +153,20 @@ export def "ci scm branch" [
     try {
       git branch $branch_name
       print $"✅ Created branch: ($branch_name) from ($from)"
+      {status: "success" error: null branch: $branch_name}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error
-      return
+      {status: "error" error: $"Failed to create branch: ($err.msg)" branch: null}
     }
   } else {
     $"Creating branch: ($branch_name) from ($from)" | ci log info
     try {
       git checkout -b $branch_name
       print $"✅ Successfully created and switched to branch: ($branch_name) from ($from)"
+      {status: "success" error: null branch: $branch_name}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error
-      return
+      {status: "error" error: $"Failed to create branch: ($err.msg)" branch: null}
     }
   }
 }

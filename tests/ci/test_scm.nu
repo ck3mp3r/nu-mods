@@ -144,11 +144,14 @@ export def "test ci scm branch error not git repo" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-ci scm branch 'test' --feature
+ci scm branch 'test' --feature | to json
 "
-    let result = (nu -c $test_script | complete)
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($result.exit_code != 0) $"Expected non-zero exit code but got: ($result.exit_code)"
+    assert ($result.status == "error") $"Expected error status"
+    assert ($result.branch == null) $"Expected null branch"
+    assert ($result.error != null) $"Expected error message"
   }
 }
 

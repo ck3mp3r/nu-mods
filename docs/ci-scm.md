@@ -121,6 +121,15 @@ ci scm branch <description> [flags]
 - `--from <branch>` - Base branch (default: main)
 - `--no-checkout` - Create without checking out
 
+**Returns:**
+```nu
+{
+  status: "success" | "error",
+  error: string?,          # Error message if status is "error"
+  branch: string?          # Branch name that was created
+}
+```
+
 **Branch Format:**
 ```
 [<prefix>/]<flow>/<description>
@@ -152,6 +161,12 @@ ci scm branch "v2.1.0" --release --from develop
 # Chore without checkout
 ci scm branch "update dependencies" --chore --no-checkout
 # Creates: chore/update-dependencies-and-cleanup (no checkout)
+
+# Use in workflows
+let result = (ci scm branch "add feature")
+if $result.status == "success" {
+  print $"Created branch: ($result.branch)"
+}
 ```
 
 ## Flow Types
