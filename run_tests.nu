@@ -6,8 +6,8 @@
 def main [] {
   print "Running tests...\n"
 
-  # Discover all test files
-  let test_files = (glob tests/test_*.nu)
+  # Discover all test files (including in subdirectories)
+  let test_files = (glob tests/**/test_*.nu)
 
   let results = (
     $test_files | each {|test_file|
