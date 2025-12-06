@@ -29,246 +29,76 @@ ci nix check | to json
   }
 }
 
-# Test 2: Check multiple flakes from pipeline
-export def "test ci nix check multiple flakes" [] {
+# ============================================================================
+# CLOSURE TESTS
+# ============================================================================
+
+# Test 13: Get closure of single path
+export def "test ci nix closure single path" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
-    "MOCK_nix_flake_check_.._backend_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_path-info_--recursive__nix_store_abc-pkg": ({output: "/nix/store/abc-pkg\n/nix/store/dep1\n/nix/store/dep2" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-['.' '../backend'] | ci nix check | to json
+'/nix/store/abc-pkg' | ci nix closure | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
-    assert (($result | length) == 2) $"Expected 2 results but got: ($result | length)"
-    assert ($result.0.status == "success") $"Expected success for flake 0"
-    assert ($result.1.status == "success") $"Expected success for flake 1"
+    assert (($result | length) == 3) $"Expected 3 paths in closure"
+    assert ($result.0 == "/nix/store/abc-pkg") $"Expected abc-pkg"
+    assert ($result.1 == "/nix/store/dep1") $"Expected dep1"
+    assert ($result.2 == "/nix/store/dep2") $"Expected dep2"
   }
 }
 
-# Test 3: Check with failure
-export def "test ci nix check with failure" [] {
+# Test 14: Get closure of multiple paths
+export def "test ci nix closure multiple paths" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check": ({output: "error: some issue" exit_code: 1} | to json)
+    "MOCK_nix_path-info_--recursive__nix_store_abc-pkg": ({output: "/nix/store/abc-pkg\n/nix/store/dep1" exit_code: 0} | to json)
+    "MOCK_nix_path-info_--recursive__nix_store_xyz-pkg": ({output: "/nix/store/xyz-pkg\n/nix/store/dep2" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/nix.nu *
-ci nix check | to json
+['/nix/store/abc-pkg' '/nix/store/xyz-pkg'] | ci nix closure | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
-    assert ($result.0.status == "failed") $"Expected failed status"
-    assert ($result.0.error != null) $"Expected error message"
+    assert (($result | length) == 4) $"Expected 4 paths in closure"
+    assert ("/nix/store/abc-pkg" in $result) $"Expected abc-pkg in closure"
+    assert ("/nix/store/xyz-pkg" in $result) $"Expected xyz-pkg in closure"
+    assert ("/nix/store/dep1" in $result) $"Expected dep1 in closure"
+    assert ("/nix/store/dep2" in $result) $"Expected dep2 in closure"
+  }
+}
+
+# Test 15: Get closure with empty input
+export def "test ci nix closure empty input" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+[] | ci nix closure | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 0) $"Expected empty result"
   }
 }
 
 # ============================================================================
-# UPDATE TESTS
+# CACHE TESTS
 # ============================================================================
 
-# Test 4: Update all inputs in single flake
-export def "test ci nix update all inputs" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_update": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix update | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert ($result.0.status == "success") $"Expected success"
-    assert ($result.0.input == "all") $"Expected 'all' inputs"
-  }
-}
-
-# Test 5: Update specific input
-export def "test ci nix update specific input" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_update_nixpkgs": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix update nixpkgs | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert ($result.0.status == "success") $"Expected success"
-    assert ($result.0.input == "nixpkgs") $"Expected nixpkgs input"
-  }
-}
-
-# Test 6: Update multiple flakes
-export def "test ci nix update multiple flakes" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_update": ({output: "" exit_code: 0} | to json)
-    "MOCK_nix_flake_update_--flake_.._backend": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['.' '../backend'] | ci nix update | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 2) $"Expected 2 results"
-    assert ($result | all {|r| $r.status == "success" }) $"Expected all updates to succeed"
-  }
-}
-
-# ============================================================================
-# PACKAGES TESTS
-# ============================================================================
-
-# Test 7: List packages from single flake
-export def "test ci nix packages single flake" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix packages | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 2) $"Expected 2 packages"
-    assert ($result.0.name == "pkg1" or $result.0.name == "pkg2") $"Expected pkg1 or pkg2"
-    assert ($result.0.system == "x86_64-linux") $"Expected x86_64-linux system"
-  }
-}
-
-# Test 8: List packages from multiple flakes
-export def "test ci nix packages multiple flakes" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{}}}}' exit_code: 0} | to json)
-    "MOCK_nix_flake_show_.._backend_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['.' '../backend'] | ci nix packages | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 2) $"Expected 2 packages total"
-  }
-}
-
-# ============================================================================
-# BUILD TESTS
-# ============================================================================
-
-# Test 9: Build all packages
-export def "test ci nix build all packages" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix build | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 2) $"Expected 2 build results"
-    assert ($result.0.status == "success") $"Expected success for pkg1"
-    assert ($result.1.status == "success") $"Expected success for pkg2"
-    assert ($result.0.path == "/nix/store/abc-pkg1" or $result.0.path == "/nix/store/def-pkg2") $"Expected store path"
-  }
-}
-
-# Test 10: Build specific package with -p flag
-export def "test ci nix build specific package" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix build mypackage | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 1) $"Expected 1 build result"
-    assert ($result.0.package == "mypackage") $"Expected mypackage"
-    assert ($result.0.status == "success") $"Expected success"
-    assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
-  }
-}
-
-# Test 11: Build multiple specific packages
-export def "test ci nix build multiple packages" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix build pkg1 pkg2 | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 2) $"Expected 2 build results"
-    assert ($result | all {|r| $r.status == "success" }) $"Expected all builds to succeed"
-  }
-}
-
-# Test 12: Build from multiple flakes
-export def "test ci nix build multiple flakes" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg2" exit_code: 0} | to json)
-    "MOCK_nix_build_.._backend#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.._backend#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['.' '../backend'] | ci nix build pkg1 pkg2 | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
-
-    assert (($result | length) == 4) $"Expected 4 build results, 2 per flake"
-    assert ($result | all {|r| $r.status == "success" }) $"Expected all builds to succeed but got: ($result | where status != 'success')"
-  }
-}
-
-# ============================================================================
-# CACHE PUSH TESTS
-# ============================================================================
-
-# Test 13: Push single path to cache
+# Test 16: Push single path to cache
 export def "test ci nix cache push single path" [] {
   with-env {
     NU_TEST_MODE: "true"

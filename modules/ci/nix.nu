@@ -330,6 +330,30 @@ export def "ci nix build" [
   } | flatten
 }
 
+# Get closure of store paths (all dependencies) - pipeline-friendly
+export def "ci nix closure" []: [
+  list<string> -> list<string>
+  string -> list<string>
+] {
+  let paths = $in | if ($in | describe | str starts-with "list") { $in } else { [$in] }
+
+  if ($paths | is-empty) {
+    return []
+  }
+
+  $paths | each {|path|
+    try {
+      # Use nix path-info --recursive to get all dependencies
+      nix path-info --recursive $path
+      | lines
+      | where {|line| ($line | str trim | is-not-empty) }
+    } catch {|err|
+      $"Failed to get closure for ($path): ($err.msg)" | ci log error
+      []
+    }
+  } | flatten | uniq
+}
+
 # Check cache status or push store paths to binary cache (pipeline-friendly)
 export def "ci nix cache" [
   cache: string # Target cache URI to push to (e.g., s3://bucket, cachix, file:///path)
