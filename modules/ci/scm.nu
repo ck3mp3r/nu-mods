@@ -169,6 +169,46 @@ export def "ci scm branch" [
   }
 }
 
+# Get list of changed files since branch was created
+export def "ci scm changes" [
+  --base: string = "main" # Base branch to compare against
+  --staged (-s) # Only return staged files
+]: [
+  nothing -> list<string>
+] {
+  # Verify we're in a git repository
+  try {
+    git status --porcelain | ignore
+  } catch {|err|
+    "Not in a git repository" | ci log error
+    error make {msg: $"Not in a git repository: ($err.msg)"}
+  }
+
+  if $staged {
+    # Return only staged files
+    $"Getting staged files" | ci log info
+    try {
+      git diff --cached --name-only | lines | where {|line| $line | is-not-empty }
+    } catch {|err|
+      $"Failed to get staged files: ($err.msg)" | ci log error
+      []
+    }
+  } else {
+    # Return all changed files since branch diverged from base
+    $"Getting all changes since divergence from ($base)" | ci log info
+    try {
+      # Find merge base (where branch diverged)
+      let merge_base = (git merge-base HEAD $base | str trim)
+
+      # Get all changed files since merge base
+      git diff --name-only $merge_base | lines | where {|line| $line | is-not-empty }
+    } catch {|err|
+      $"Failed to get changes: ($err.msg)" | ci log error
+      []
+    }
+  }
+}
+
 # Commit files to git with optional message
 export def "ci scm commit" [
   --message (-m): string # Commit message (default: enumerate changed files)

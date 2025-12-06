@@ -61,6 +61,45 @@ Examples:
 
 ---
 
+### `ci scm changes`
+
+Get list of changed files since branch was created.
+
+**Usage:**
+```nu
+ci scm changes [--base <branch>] [--staged]
+```
+
+**Options:**
+- `--base` - Base branch to compare against (default: main)
+- `--staged`, `-s` - Only return staged files
+
+**Returns:** `list<string>` - List of file paths
+
+**Examples:**
+
+```nu
+# Get all changes since branch diverged from main
+ci scm changes
+
+# Get changes since diverged from develop
+ci scm changes --base develop
+
+# Get only staged files
+ci scm changes --staged
+
+# Use in workflows
+let changed = (ci scm changes)
+print $"Changed ($changed | length) files: ($changed | str join ', ')"
+```
+
+**Behavior:**
+
+- **Without `--staged`**: Returns ALL files changed since the branch diverged from the base branch (uses `git merge-base` to find divergence point, then `git diff --name-only`)
+- **With `--staged`**: Returns only files that are currently staged (uses `git diff --cached --name-only`)
+
+---
+
 ### `ci scm branch`
 
 Create standardized branches with flow-based naming.

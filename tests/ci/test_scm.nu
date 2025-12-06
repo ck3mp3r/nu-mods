@@ -281,10 +281,100 @@ use modules/ci/scm.nu *
 }
 
 # ============================================================================
+# CHANGES TESTS
+# ============================================================================
+
+# Test 14: Get all changes since branch created
+export def "test ci scm changes all files" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_merge-base_HEAD_main": ({output: "abc123def456" exit_code: 0} | to json)
+    "MOCK_git_diff_--name-only_abc123def456": ({output: "file1.txt\nfile2.nu\nsrc/main.nu" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm changes | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 3) $"Expected 3 files"
+    assert ($result | any {|f| $f == "file1.txt" }) $"Expected file1.txt"
+    assert ($result | any {|f| $f == "file2.nu" }) $"Expected file2.nu"
+    assert ($result | any {|f| $f == "src/main.nu" }) $"Expected src/main.nu"
+  }
+}
+
+# Test 15: Get changes with custom base branch
+export def "test ci scm changes custom base" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_merge-base_HEAD_develop": ({output: "xyz789abc" exit_code: 0} | to json)
+    "MOCK_git_diff_--name-only_xyz789abc": ({output: "README.md\ndocs/guide.md" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm changes --base develop | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 files"
+    assert ($result | any {|f| $f == "README.md" }) $"Expected README.md"
+    assert ($result | any {|f| $f == "docs/guide.md" }) $"Expected docs/guide.md"
+  }
+}
+
+# Test 16: Get only staged files
+export def "test ci scm changes staged only" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_diff_--cached_--name-only": ({output: "staged1.nu\nstaged2.txt" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm changes --staged | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 2) $"Expected 2 staged files"
+    assert ($result | any {|f| $f == "staged1.nu" }) $"Expected staged1.nu"
+    assert ($result | any {|f| $f == "staged2.txt" }) $"Expected staged2.txt"
+  }
+}
+
+# Test 17: No changes returns empty list
+export def "test ci scm changes no changes" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_merge-base_HEAD_main": ({output: "abc123" exit_code: 0} | to json)
+    "MOCK_git_diff_--name-only_abc123": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm changes | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 0) $"Expected empty list"
+  }
+}
+
+# ============================================================================
 # CONFIG TESTS
 # ============================================================================
 
-# Test 14: Config with email auto-derives name
+# Test 19: Config with email auto-derives name
 export def "test ci scm config auto derive name" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -306,7 +396,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 15: Config with custom name
+# Test 20: Config with custom name
 export def "test ci scm config custom name" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -327,7 +417,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 16: Config with global flag
+# Test 21: Config with global flag
 export def "test ci scm config global" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -348,7 +438,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 17: Config with invalid email
+# Test 22: Config with invalid email
 export def "test ci scm config invalid email" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -366,7 +456,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 18: Config with hyphenated email username
+# Test 23: Config with hyphenated email username
 export def "test ci scm config hyphenated email" [] {
   with-env {
     NU_TEST_MODE: "true"
