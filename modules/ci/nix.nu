@@ -88,6 +88,8 @@ export def "ci nix check" [
         $cmd_args = ($cmd_args | append ($args | split row " "))
       }
 
+      $cmd_args = ($cmd_args | append "--no-update-lock-file")
+
       nix flake check ...$cmd_args
       {flake: $flake status: "success" error: null}
     } catch {|err|
@@ -165,9 +167,9 @@ export def "ci nix packages" []: [
 
     try {
       let flake_info = if $flake == "." {
-        nix flake show --json | from json
+        nix flake show --json --no-update-lock-file | from json
       } else {
-        nix flake show $flake --json | from json
+        nix flake show $flake --json --no-update-lock-file | from json
       }
 
       if ($flake_info != null) and ("packages" in $flake_info) {
@@ -218,9 +220,9 @@ export def "ci nix build" [
 
       try {
         let flake_info = if $flake == "." {
-          nix flake show --json | from json
+          nix flake show --json --no-update-lock-file | from json
         } else {
-          nix flake show $flake --json | from json
+          nix flake show $flake --json --no-update-lock-file | from json
         }
 
         if ($flake_info == null) or ("packages" not-in $flake_info) {
@@ -248,7 +250,7 @@ export def "ci nix build" [
 
             try {
               let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-              mut cmd_args = [$target "--print-out-paths" "--no-link"]
+              mut cmd_args = [$target "--print-out-paths" "--no-link" "--no-update-lock-file"]
 
               if $impure {
                 $cmd_args = ($cmd_args | append "--impure")
@@ -292,7 +294,7 @@ export def "ci nix build" [
 
         try {
           let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-          mut cmd_args = [$target "--print-out-paths" "--no-link"]
+          mut cmd_args = [$target "--print-out-paths" "--no-link" "--no-update-lock-file"]
 
           if $impure {
             $cmd_args = ($cmd_args | append "--impure")

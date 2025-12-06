@@ -13,7 +13,7 @@ use ../../modules/ci/nix.nu *
 export def "test ci nix check single flake" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -33,8 +33,8 @@ ci nix check | to json
 export def "test ci nix check multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check": ({output: "" exit_code: 0} | to json)
-    "MOCK_nix_flake_check_.._backend": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_.._backend_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -139,7 +139,7 @@ use modules/ci/nix.nu *
 export def "test ci nix packages single flake" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -159,8 +159,8 @@ ci nix packages | to json
 export def "test ci nix packages multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{}}}}' exit_code: 0} | to json)
-    "MOCK_nix_flake_show_.._backend_--json": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_flake_show_.._backend_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg2":{}}}}' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -182,9 +182,9 @@ use modules/ci/nix.nu *
 export def "test ci nix build all packages" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_show_--json": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
+    "MOCK_nix_flake_show_--json_--no-update-lock-file": ({output: '{"packages":{"x86_64-linux":{"pkg1":{},"pkg2":{}}}}' exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -205,7 +205,7 @@ ci nix build | to json
 export def "test ci nix build specific package" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
+    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -226,8 +226,8 @@ ci nix build mypackage | to json
 export def "test ci nix build multiple packages" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -246,10 +246,10 @@ ci nix build pkg1 pkg2 | to json
 export def "test ci nix build multiple flakes" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg2" exit_code: 0} | to json)
-    "MOCK_nix_build_.._backend#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_build_.._backend#pkg2_--print-out-paths_--no-link": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg2" exit_code: 0} | to json)
+    "MOCK_nix_build_.._backend#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.._backend#pkg2_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/def-pkg2" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -313,7 +313,7 @@ use modules/ci/nix.nu *
 export def "test ci nix build and push pipeline" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
+    "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
     "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg1": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
@@ -401,7 +401,7 @@ use modules/ci/nix.nu *
 export def "test ci nix check with impure" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--impure": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--impure_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -419,7 +419,7 @@ ci nix check --impure | to json
 export def "test ci nix check with args" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--verbose_--option_cores_4": ({output: "" exit_code: 0} | to json)
+    "MOCK_nix_flake_check_--verbose_--option_cores_4_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -437,7 +437,7 @@ ci nix check --args '--verbose --option cores 4' | to json
 export def "test ci nix build with impure" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--impure": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
+    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--no-update-lock-file_--impure": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -456,7 +456,7 @@ ci nix build mypackage --impure | to json
 export def "test ci nix build with args" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--option_cores_8": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
+    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-link_--no-update-lock-file_--option_cores_8": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
