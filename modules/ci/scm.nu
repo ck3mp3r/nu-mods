@@ -283,9 +283,16 @@ export def "ci scm commit" [
 
   # Push if requested
   if $push {
-    $"Pushing to remote" | ci log info
+    # Get current branch name
+    let current_branch = try {
+      git rev-parse --abbrev-ref HEAD | str trim
+    } catch {
+      "HEAD"
+    }
+    
+    $"Pushing to origin ($current_branch)" | ci log info
     try {
-      git push
+      git push origin $current_branch
       {status: "success" error: null message: $commit_message pushed: true}
     } catch {|err|
       $"Failed to push: ($err.msg)" | ci log error

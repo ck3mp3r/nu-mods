@@ -288,7 +288,8 @@ export def "test ci scm commit with push" [] {
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
     "MOCK_git_commit_-m_feat:_add_feature": ({output: "[main abc123] feat: add feature" exit_code: 0} | to json)
-    "MOCK_git_push": ({output: "To github.com:user/repo.git" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "feature/test-branch" exit_code: 0} | to json)
+    "MOCK_git_push_origin_feature_test-branch": ({output: "To github.com:user/repo.git" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -311,7 +312,8 @@ export def "test ci scm commit push failure" [] {
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
     "MOCK_git_commit_-m_test": ({output: "[main def456] test" exit_code: 0} | to json)
-    "MOCK_git_push": ({output: "fatal: remote error" exit_code: 1} | to json)
+    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
+    "MOCK_git_push_origin_main": ({output: "fatal: remote error" exit_code: 1} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
