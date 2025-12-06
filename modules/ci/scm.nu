@@ -6,6 +6,63 @@ export def "ci scm" [] {
   show-help "ci scm"
 }
 
+# Configure git user name and email
+export def "ci scm config" [
+  --name (-n): string # Git user name (default: derived from email)
+  --global (-g) # Set globally instead of repository-only
+]: [
+  string -> record
+] {
+  # Parse email from stdin
+  let email = $in | str trim
+
+  if $email == "" {
+    "Email is required" | ci log error
+    return {status: "error" error: "Email is required"}
+  }
+
+  # Validate email format
+  if not ($email | str contains "@") {
+    "Invalid email format" | ci log error
+    return {status: "error" error: "Invalid email format"}
+  }
+
+  # Derive name from email if not provided
+  let user_name = if ($name | is-not-empty) {
+    $name
+  } else {
+    # Extract username part before @ and capitalize
+    let username = ($email | split row "@" | first)
+    $username
+    | str replace --all "." " "
+    | str replace --all "_" " "
+    | str replace --all "-" " "
+  }
+
+  # Determine scope
+  let scope = if $global { "global" } else { "local" }
+  let scope_flag = if $global { "--global" } else { "--local" }
+
+  # Set git config
+  $"Setting git user.name to '($user_name)' \(($scope)\)" | ci log info
+  try {
+    git config $scope_flag user.name $user_name
+  } catch {|err|
+    $"Failed to set user.name: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to set user.name: ($err.msg)"}
+  }
+
+  $"Setting git user.email to '($email)' \(($scope)\)" | ci log info
+  try {
+    git config $scope_flag user.email $email
+  } catch {|err|
+    $"Failed to set user.email: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to set user.email: ($err.msg)"}
+  }
+
+  {status: "success" error: null name: $user_name email: $email scope: $scope}
+}
+
 # Create a new git branch with standardized naming convention based on SCM flow types
 export def "ci scm branch" [
   description?: string # Description for the branch

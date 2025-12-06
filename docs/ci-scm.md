@@ -4,6 +4,63 @@ Standardized branch management following conventional flow types.
 
 ## Commands
 
+### `ci scm config`
+
+Configure git user name and email for commits.
+
+**Usage:**
+```nu
+<email> | ci scm config [--name <name>] [--global]
+```
+
+**Input:**
+- Email address (via pipe)
+
+**Options:**
+- `--name`, `-n` - Git user name (default: derived from email)
+- `--global`, `-g` - Set globally instead of repository-only
+
+**Returns:**
+```nu
+{
+  status: "success" | "error",
+  error: string?,           # Error message if status is "error"
+  name: string,            # Git user name that was set
+  email: string,           # Git user email that was set
+  scope: "local" | "global" # Configuration scope
+}
+```
+
+**Examples:**
+
+```nu
+# Auto-derive name from email (john.doe -> "john doe")
+"john.doe@example.com" | ci scm config
+
+# Set custom name
+"john@example.com" | ci scm config --name "John Doe"
+
+# Set globally (affects all repos)
+"bot@ci.example.com" | ci scm config --global
+
+# Use in CI pipeline
+"github-actions[bot]@users.noreply.github.com" | ci scm config --name "GitHub Actions"
+```
+
+**Name Derivation:**
+
+When `--name` is not provided, the name is automatically derived from the email username:
+- Dots (`.`) → spaces
+- Underscores (`_`) → spaces  
+- Hyphens (`-`) → spaces
+
+Examples:
+- `john.doe@example.com` → `john doe`
+- `first_last@company.com` → `first last`
+- `user-name@domain.com` → `user name`
+
+---
+
 ### `ci scm branch`
 
 Create standardized branches with flow-based naming.

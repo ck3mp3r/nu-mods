@@ -279,3 +279,109 @@ use modules/ci/scm.nu *
     assert ($result.error != null) $"Expected error message"
   }
 }
+
+# ============================================================================
+# CONFIG TESTS
+# ============================================================================
+
+# Test 14: Config with email auto-derives name
+export def "test ci scm config auto derive name" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_config_--local_user.name_john_doe": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_config_--local_user.email_john.doe@example.com": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'john.doe@example.com' | ci scm config | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success but got: ($result.status)"
+    assert ($result.name == "john doe") $"Expected 'john doe' but got: ($result.name)"
+    assert ($result.email == "john.doe@example.com") $"Expected email"
+    assert ($result.scope == "local") $"Expected local scope"
+  }
+}
+
+# Test 15: Config with custom name
+export def "test ci scm config custom name" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_config_--local_user.name_John_Doe": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_config_--local_user.email_john@example.com": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'john@example.com' | ci scm config --name 'John Doe' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.name == "John Doe") $"Expected 'John Doe'"
+    assert ($result.email == "john@example.com") $"Expected email"
+  }
+}
+
+# Test 16: Config with global flag
+export def "test ci scm config global" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_config_--global_user.name_bot_user": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_config_--global_user.email_bot_user@ci.example.com": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'bot_user@ci.example.com' | ci scm config --global | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.name == "bot user") $"Expected bot user with underscores replaced"
+    assert ($result.scope == "global") $"Expected global scope"
+  }
+}
+
+# Test 17: Config with invalid email
+export def "test ci scm config invalid email" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'notanemail' | ci scm config | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "error") $"Expected error status"
+    assert ($result.error == "Invalid email format") $"Expected invalid email error"
+  }
+}
+
+# Test 18: Config with hyphenated email username
+export def "test ci scm config hyphenated email" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_config_--local_user.name_first_middle_last": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_config_--local_user.email_first-middle-last@company.com": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'first-middle-last@company.com' | ci scm config | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.name == "first middle last") $"Expected hyphens replaced with spaces"
+  }
+}
