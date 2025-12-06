@@ -193,11 +193,11 @@ $env.NU_LOG_LEVEL = "ERROR"  # Show errors only
 
 ### `ci scm commit`
 
-Stage and commit files with optional custom message.
+Stage and commit files with optional custom message and push.
 
 **Usage:**
 ```nu
-ci scm commit [files] [--message <msg>]
+ci scm commit [files] [--message <msg>] [--push]
 ```
 
 **Positional:**
@@ -207,13 +207,15 @@ ci scm commit [files] [--message <msg>]
 **Options:**
 - `--message`, `-m` - Custom commit message
   - If not provided, auto-generates message from changed files
+- `--push`, `-p` - Push to remote after successful commit
 
 **Returns:**
 ```nu
 {
   status: "success" | "error" | "no_changes",
   error: string?,          # Error message if status is "error"
-  message: string?         # Commit message if status is "success"
+  message: string?,        # Commit message if status is "success"
+  pushed: bool             # Whether push succeeded
 }
 ```
 
@@ -231,6 +233,9 @@ ci scm commit file.txt --message "fix: update config"
 
 # Commit multiple files as arguments
 ci scm commit file1.txt file2.txt --message "chore: update files"
+
+# Commit and push in one operation
+ci scm commit --message "feat: add new feature" --push
 ```
 
 **Auto-generated Messages:**

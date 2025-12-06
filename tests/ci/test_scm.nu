@@ -277,6 +277,53 @@ use modules/ci/scm.nu *
 
     assert ($result.status == "failed") $"Expected failed status"
     assert ($result.error != null) $"Expected error message"
+    assert ($result.pushed == false) $"Expected pushed to be false"
+  }
+}
+
+# Test 14: Commit with push flag
+export def "test ci scm commit with push" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_commit_-m_feat:_add_feature": ({output: "[main abc123] feat: add feature" exit_code: 0} | to json)
+    "MOCK_git_push": ({output: "To github.com:user/repo.git" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm commit -m 'feat: add feature' --push | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.pushed == true) $"Expected pushed to be true"
+    assert ($result.message == "feat: add feature") $"Expected commit message"
+  }
+}
+
+# Test 15: Commit with push failure
+export def "test ci scm commit push failure" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_commit_-m_test": ({output: "[main def456] test" exit_code: 0} | to json)
+    "MOCK_git_push": ({output: "fatal: remote error" exit_code: 1} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm commit -m 'test' --push | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success status for commit"
+    assert ($result.pushed == false) $"Expected pushed to be false"
+    assert ($result.error != null) $"Expected push error message"
   }
 }
 
@@ -284,7 +331,7 @@ use modules/ci/scm.nu *
 # CHANGES TESTS
 # ============================================================================
 
-# Test 14: Get all changes since branch created
+# Test 16: Get all changes since branch created
 export def "test ci scm changes all files" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -307,7 +354,7 @@ ci scm changes | to json
   }
 }
 
-# Test 15: Get changes with custom base branch
+# Test 17: Get changes with custom base branch
 export def "test ci scm changes custom base" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -329,7 +376,7 @@ ci scm changes --base develop | to json
   }
 }
 
-# Test 16: Get only staged files
+# Test 18: Get only staged files
 export def "test ci scm changes staged only" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -350,7 +397,7 @@ ci scm changes --staged | to json
   }
 }
 
-# Test 17: No changes returns empty list
+# Test 19: No changes returns empty list
 export def "test ci scm changes no changes" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -374,7 +421,7 @@ ci scm changes | to json
 # CONFIG TESTS
 # ============================================================================
 
-# Test 19: Config with email auto-derives name
+# Test 20: Config with email auto-derives name
 export def "test ci scm config auto derive name" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -396,7 +443,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 20: Config with custom name
+# Test 21: Config with custom name
 export def "test ci scm config custom name" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -417,7 +464,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 21: Config with global flag
+# Test 22: Config with global flag
 export def "test ci scm config global" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -438,7 +485,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 22: Config with invalid email
+# Test 23: Config with invalid email
 export def "test ci scm config invalid email" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -456,7 +503,7 @@ use modules/ci/scm.nu *
   }
 }
 
-# Test 23: Config with hyphenated email username
+# Test 24: Config with hyphenated email username
 export def "test ci scm config hyphenated email" [] {
   with-env {
     NU_TEST_MODE: "true"

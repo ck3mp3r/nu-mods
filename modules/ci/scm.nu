@@ -212,6 +212,7 @@ export def "ci scm changes" [
 # Commit files to git with optional message
 export def "ci scm commit" [
   --message (-m): string # Commit message (default: enumerate changed files)
+  --push (-p) # Push to remote after commit
 ]: [
   list<string> -> record
   string -> record
@@ -241,7 +242,7 @@ export def "ci scm commit" [
       git add ...$files
     } catch {|err|
       $"Failed to stage files: ($err.msg)" | ci log error
-      return {status: "failed" error: $err.msg message: null}
+      return {status: "failed" error: $err.msg message: null pushed: false}
     }
   } else {
     # No files specified, stage all changed files
@@ -250,7 +251,7 @@ export def "ci scm commit" [
       git add -A
     } catch {|err|
       $"Failed to stage files: ($err.msg)" | ci log error
-      return {status: "failed" error: $err.msg message: null}
+      return {status: "failed" error: $err.msg message: null pushed: false}
     }
   }
 
@@ -263,7 +264,7 @@ export def "ci scm commit" [
 
     if ($staged | is-empty) {
       "No changes to commit" | ci log warning
-      return {status: "success" error: null message: "No changes to commit"}
+      return {status: "success" error: null message: "No changes to commit" pushed: false}
     }
 
     # Enumerate changed files
@@ -275,9 +276,22 @@ export def "ci scm commit" [
   $"Creating commit" | ci log info
   try {
     git commit -m $commit_message
-    {status: "success" error: null message: $commit_message}
   } catch {|err|
     $"Failed to commit: ($err.msg)" | ci log error
-    {status: "failed" error: $err.msg message: null}
+    return {status: "failed" error: $err.msg message: null pushed: false}
+  }
+
+  # Push if requested
+  if $push {
+    $"Pushing to remote" | ci log info
+    try {
+      git push
+      {status: "success" error: null message: $commit_message pushed: true}
+    } catch {|err|
+      $"Failed to push: ($err.msg)" | ci log error
+      {status: "success" error: $"Push failed: ($err.msg)" message: $commit_message pushed: false}
+    }
+  } else {
+    {status: "success" error: null message: $commit_message pushed: false}
   }
 }
