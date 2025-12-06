@@ -111,3 +111,76 @@ export def "ci scm branch" [
     }
   }
 }
+
+# Commit files to git with optional message
+export def "ci scm commit" [
+  --message (-m): string # Commit message (default: enumerate changed files)
+]: [
+  list<string> -> record
+  string -> record
+  nothing -> record
+] {
+  # Parse input files
+  let files = $in | if ($in | describe | str starts-with "list") {
+    $in
+  } else if ($in | describe) == "string" {
+    [$in]
+  } else {
+    []
+  }
+
+  # Verify we're in a git repository
+  try {
+    git status --porcelain | ignore
+  } catch {|err|
+    "Not in a git repository" | ci log error
+    error make {msg: $"Not in a git repository: ($err.msg)"}
+  }
+
+  # Stage files
+  if ($files | is-not-empty) {
+    $"Staging ($files | length) files" | ci log info
+    try {
+      git add ...$files
+    } catch {|err|
+      $"Failed to stage files: ($err.msg)" | ci log error
+      return {status: "failed" error: $err.msg message: null}
+    }
+  } else {
+    # No files specified, stage all changed files
+    "Staging all changed files" | ci log info
+    try {
+      git add -A
+    } catch {|err|
+      $"Failed to stage files: ($err.msg)" | ci log error
+      return {status: "failed" error: $err.msg message: null}
+    }
+  }
+
+  # Generate commit message if not provided
+  let commit_message = if ($message | is-not-empty) {
+    $message
+  } else {
+    # Get list of staged files
+    let staged = (git diff --cached --name-only | lines)
+
+    if ($staged | is-empty) {
+      "No changes to commit" | ci log warning
+      return {status: "success" error: null message: "No changes to commit"}
+    }
+
+    # Enumerate changed files
+    let file_list = ($staged | str join ", ")
+    $"chore: update ($staged | length) files\n\nChanged files:\n- ($staged | str join '\n- ')"
+  }
+
+  # Commit
+  $"Creating commit" | ci log info
+  try {
+    git commit -m $commit_message
+    {status: "success" error: null message: $commit_message}
+  } catch {|err|
+    $"Failed to commit: ($err.msg)" | ci log error
+    {status: "failed" error: $err.msg message: null}
+  }
+}

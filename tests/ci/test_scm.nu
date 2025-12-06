@@ -172,3 +172,110 @@ ci scm branch 'default test'
     assert ($output | str contains "feature/default-test") $"Expected feature branch by default but got: ($output)"
   }
 }
+
+# ============================================================================
+# COMMIT TESTS
+# ============================================================================
+
+# Test 9: Commit specific files with message
+export def "test ci scm commit with files and message" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_file1.txt_file2.txt": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_commit_-m_feat:_add_new_feature": ({output: "[main abc123] feat: add new feature" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+['file1.txt' 'file2.txt'] | ci scm commit --message 'feat: add new feature' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success but got: ($result.status)"
+    assert ($result.message == "feat: add new feature") $"Expected message but got: ($result.message)"
+  }
+}
+
+# Test 10: Commit with custom message  
+export def "test ci scm commit with custom message" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_commit_-m_test_message": ({output: "[main def456] test message" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm commit -m 'test message' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success but got: ($result.status)"
+    assert ($result.message == "test message") $"Expected test message"
+  }
+}
+
+# Test 11: Commit single file via string input
+export def "test ci scm commit single file" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_flake.lock": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_commit_-m_chore:_update_flake.lock": ({output: "[main ghi789] chore: update flake.lock" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'flake.lock' | ci scm commit -m 'chore: update flake.lock' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  }
+}
+
+# Test 12: Commit with no changes
+export def "test ci scm commit no changes" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_diff_--cached_--name-only": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+ci scm commit | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.message == "No changes to commit") $"Expected no changes message"
+  }
+}
+
+# Test 13: Commit failure handling
+export def "test ci scm commit failure" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
+    "MOCK_git_add_file.txt": ({output: "fatal: pathspec 'file.txt' did not match any files" exit_code: 128} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/scm.nu *
+'file.txt' | ci scm commit -m 'test' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "failed") $"Expected failed status"
+    assert ($result.error != null) $"Expected error message"
+  }
+}
