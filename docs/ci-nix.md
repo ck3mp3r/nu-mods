@@ -223,6 +223,43 @@ ci nix build | where status == "failed" | select package error
 
 ---
 
+### `ci nix closure`
+
+Get the full closure (all dependencies) of Nix store paths.
+
+**Input:**
+- `list<string>` - List of Nix store paths
+- `string` - Single store path
+
+**Output:**
+- `list<string>` - List of all paths in the closure (input paths + all dependencies)
+
+**Examples:**
+```nu
+# Get closure of a single path
+'/nix/store/abc-myapp' | ci nix closure
+
+# Get closure of multiple paths
+['/nix/store/abc-myapp' '/nix/store/def-api'] | ci nix closure
+
+# Build and get full closure (for pushing to cache)
+ci nix build myapp | where status == "success" | get path | ci nix closure
+
+# Build, get closure, and push everything to cache
+ci nix build 
+  | where status == "success" 
+  | get path 
+  | ci nix closure 
+  | ci nix cache cachix
+```
+
+**Use Cases:**
+- **Cache population**: Push packages with all dependencies
+- **Dependency analysis**: See what a package depends on
+- **Offline installations**: Export complete closures
+
+---
+
 ### `ci nix cache`
 
 Check upstream cache status and/or push store paths to binary cache.
@@ -292,10 +329,18 @@ ci nix build
   | get path 
   | ci nix cache cachix
 
+# Build, get full closure, and push everything
+ci nix build
+  | where status == "success"
+  | get path
+  | ci nix closure
+  | ci nix cache cachix
+
 # Build specific packages, push to multiple caches
 ci nix build web api
   | where status == "success"
   | get path
+  | ci nix closure
   | tee { ci nix cache cachix }
   | ci nix cache s3://backup
 ```
@@ -423,6 +468,19 @@ $env.NU_LOG_LEVEL = "WARN"   # Warnings only
 $env.NU_LOG_LEVEL = "ERROR"  # Errors only
 ```
 
+## Deterministic Builds
+
+All build and evaluation commands use `--no-update-lock-file` to ensure:
+- Lock files are never modified during builds
+- Builds are reproducible across different machines
+- CI/CD pipelines remain deterministic
+- Flake lock files only update via explicit `ci nix update` commands
+
+This prevents unexpected lock file changes that can occur with:
+- Subdirectory flakes (`?dir=`)
+- Git shallow clones in CI
+- Transitive dependency resolution
+
 ## Best Practices
 
 1. **Use pipelines for composition:**
@@ -432,20 +490,29 @@ $env.NU_LOG_LEVEL = "ERROR"  # Errors only
 
 2. **Filter early, act on success:**
    ```nu
-   ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+   ci nix build | where status == "success" | get path | ci nix cache cachix
    ```
 
-3. **Operate on multiple flakes at once:**
+3. **Push complete closures to cache:**
+   ```nu
+   ci nix build 
+     | where status == "success" 
+     | get path 
+     | ci nix closure 
+     | ci nix cache cachix
+   ```
+
+4. **Operate on multiple flakes at once:**
    ```nu
    ["." "../backend"] | ci nix update | ci nix check | ci nix build
    ```
 
-4. **Inspect failures:**
+5. **Inspect failures:**
    ```nu
    ci nix build | where status == "failed" | select package error
    ```
 
-5. **Save intermediate results:**
+6. **Save intermediate results:**
    ```nu
    let results = (ci nix build)
    $results | where status == "success" | get path | save successful_paths.txt
