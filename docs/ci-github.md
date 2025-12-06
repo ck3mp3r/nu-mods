@@ -74,6 +74,47 @@ ci github pr list --state all
 
 ---
 
+### `ci github pr merge`
+
+Merge a pull request with auto squash and optional branch deletion.
+
+**Usage:**
+```nu
+ci github pr merge <number> [--method <method>] [--delete-branch|--no-delete-branch]
+```
+
+**Positional:**
+- `number` - PR number to merge
+
+**Options:**
+- `--method` - Merge method: squash (default), merge, rebase
+- `--delete-branch` - Delete branch after merge (default)
+- `--no-delete-branch` - Keep branch after merge
+
+**Returns:**
+```nu
+{
+  status: "success" | "error",
+  error: string?,           # Error message if status is "error"
+  pr_number: int,          # PR number that was merged
+  branch_deleted: bool     # Whether branch was deleted
+}
+```
+
+**Example:**
+```nu
+# Squash merge with branch deletion (default)
+ci github pr merge 42
+
+# Merge commit without deleting branch
+ci github pr merge 42 --method merge --no-delete-branch
+
+# Rebase merge with branch deletion
+ci github pr merge 42 --method rebase
+```
+
+---
+
 ### `ci github pr update`
 
 Update existing pull request.
@@ -212,6 +253,19 @@ ci github pr list
 
 # 4. Update PR if needed
 ci github pr update 5 --title "feat: improved feature"
+
+# 5. Merge PR with squash and delete branch
+ci github pr merge 5
+```
+
+### Automated Flake Update Workflow
+
+```nu
+# Update flake.lock, create PR, and auto-merge
+ci nix update
+ci scm commit flake.lock --message "chore: update flake.lock"
+let pr = (ci github pr create "chore: update flake.lock" "Automated flake update")
+ci github pr merge $pr.number
 ```
 
 ### Workflow Management

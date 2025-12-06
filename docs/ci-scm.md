@@ -92,3 +92,65 @@ $env.NU_LOG_LEVEL = "ERROR"  # Show errors only
 - Checks if base branch exists
 - Handles git errors gracefully
 - Provides clear error messages
+
+---
+
+### `ci scm commit`
+
+Stage and commit files with optional custom message.
+
+**Usage:**
+```nu
+ci scm commit [files] [--message <msg>]
+```
+
+**Positional:**
+- `files` - Files to stage (optional, accepts list via pipe or args)
+  - If not provided, stages all changed files
+
+**Options:**
+- `--message`, `-m` - Custom commit message
+  - If not provided, auto-generates message from changed files
+
+**Returns:**
+```nu
+{
+  status: "success" | "error" | "no_changes",
+  error: string?,          # Error message if status is "error"
+  message: string?         # Commit message if status is "success"
+}
+```
+
+**Examples:**
+
+```nu
+# Commit all changed files with auto-generated message
+ci scm commit
+
+# Commit specific file with custom message
+ci scm commit file.txt --message "fix: update config"
+
+# Commit multiple files via pipe
+["src/main.nu" "tests/test.nu"] | ci scm commit -m "feat: add new feature"
+
+# Commit multiple files as arguments
+ci scm commit file1.txt file2.txt --message "chore: update files"
+```
+
+**Auto-generated Messages:**
+
+When no message is provided, the commit message is generated from changed files:
+
+```nu
+# Single file
+ci scm commit README.md
+# Generates: "chore: update README.md"
+
+# Multiple files
+ci scm commit file1.txt file2.txt
+# Generates: "chore: update file1.txt, file2.txt"
+
+# All changes
+ci scm commit
+# Generates: "chore: update <file1>, <file2>, ..."
+```
