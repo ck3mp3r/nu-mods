@@ -74,6 +74,54 @@ ci github pr list --state all
 
 ---
 
+### `ci github pr info`
+
+Get PR information by branch name or PR number.
+
+**Usage:**
+```nu
+ci github pr info [identifier]
+```
+
+**Positional:**
+- `identifier` - Branch name or PR number (optional, default: current branch)
+
+**Returns:**
+```nu
+{
+  status: "success" | "error" | "not_found",
+  error: string?,          # Error message if not success
+  number: int,            # PR number
+  title: string,          # PR title
+  state: string,          # PR state: OPEN, CLOSED, MERGED
+  merged: bool,           # Whether PR is merged
+  mergeable: string,      # Merge status: MERGEABLE, CONFLICTING, UNKNOWN
+  url: string,            # PR URL
+  head_branch: string,    # Source branch
+  base_branch: string     # Target branch
+}
+```
+
+**Example:**
+```nu
+# Get info for current branch's PR
+ci github pr info
+
+# Get info by PR number
+ci github pr info 42
+
+# Get info by branch name
+ci github pr info "feature/my-branch"
+
+# Use in workflows
+let pr = (ci github pr info)
+if $pr.status == "success" and $pr.merged {
+  print "PR is already merged"
+}
+```
+
+---
+
 ### `ci github pr merge`
 
 Merge a pull request with auto squash and optional branch deletion.

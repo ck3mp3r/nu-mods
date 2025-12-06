@@ -132,7 +132,91 @@ ci github pr check --target main
   }
 }
 
-# Test 3: Create new PR
+# Test 3: Get PR info by current branch
+export def "test ci github pr info current branch" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "feature/test" exit_code: 0} | to json)
+    "MOCK_gh_pr_list_--head_feature_test_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[{"number":100,"title":"Test Feature","state":"OPEN","merged":false,"mergeable":"MERGEABLE","url":"https://github.com/user/repo/pull/100","headRefName":"feature/test","baseRefName":"main"}]' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr info | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.number == 100) $"Expected PR number 100"
+    assert ($result.state == "OPEN") $"Expected state OPEN"
+    assert ($result.merged == false) $"Expected merged false"
+    assert ($result.mergeable == "MERGEABLE") $"Expected mergeable"
+  }
+}
+
+# Test 4: Get PR info by PR number
+export def "test ci github pr info by number" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_view_42_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '{"number":42,"title":"Fix Bug","state":"MERGED","merged":true,"mergeable":"UNKNOWN","url":"https://github.com/user/repo/pull/42","headRefName":"fix/bug","baseRefName":"main"}' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr info 42 | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.number == 42) $"Expected PR number 42"
+    assert ($result.state == "MERGED") $"Expected state MERGED"
+    assert ($result.merged == true) $"Expected merged true"
+  }
+}
+
+# Test 5: Get PR info by branch name
+export def "test ci github pr info by branch" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_list_--head_feature_new_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[{"number":99,"title":"New Feature","state":"OPEN","merged":false,"mergeable":"CONFLICTING","url":"https://github.com/user/repo/pull/99","headRefName":"feature/new","baseRefName":"develop"}]' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr info 'feature/new' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.number == 99) $"Expected PR number 99"
+    assert ($result.mergeable == "CONFLICTING") $"Expected CONFLICTING"
+    assert ($result.base_branch == "develop") $"Expected base develop"
+  }
+}
+
+# Test 6: Get PR info - not found
+export def "test ci github pr info not found" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_list_--head_nonexistent_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[]' exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr info 'nonexistent' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "not_found") $"Expected not_found status"
+    assert ($result.error != null) $"Expected error message"
+  }
+}
+
+# Test 7: Create new PR
 export def "test ci github pr create new" [] {
   with-env {
     NU_TEST_MODE: "true"

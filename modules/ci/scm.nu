@@ -289,7 +289,7 @@ export def "ci scm commit" [
     } catch {
       "HEAD"
     }
-    
+
     $"Pushing to origin ($current_branch)" | ci log info
     try {
       git push origin $current_branch

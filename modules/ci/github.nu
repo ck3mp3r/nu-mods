@@ -82,6 +82,85 @@ export def "ci github pr check" [
   }
 }
 
+# Get PR information by branch name or PR number
+export def "ci github pr info" [
+  identifier?: string # Branch name or PR number (default: current branch)
+]: [
+  nothing -> record
+  string -> record
+] {
+  # Determine what we're looking up
+  let lookup = if ($identifier | is-empty) {
+    # Get current branch
+    let current_branch = try {
+      git rev-parse --abbrev-ref HEAD | str trim
+    } catch {
+      $"Failed to get current branch" | ci log error
+      return {status: "error" error: "Not in a git repository"}
+    }
+    {type: "branch" value: $current_branch}
+  } else if ($identifier | str trim | parse -r '^\d+$' | is-not-empty) {
+    # It's a PR number
+    {type: "number" value: $identifier}
+  } else {
+    # It's a branch name
+    {type: "branch" value: $identifier}
+  }
+
+  $"Getting PR info for ($lookup.type): ($lookup.value)" | ci log info
+
+  # Get PR information
+  if $lookup.type == "branch" {
+    # Find PR by branch name
+    let prs = try {
+      gh pr list --head $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
+    } catch {|err|
+      $"Failed to get PR info: ($err.msg)" | ci log error
+      return {status: "error" error: $err.msg}
+    }
+
+    if ($prs | is-empty) {
+      $"No PR found for branch: ($lookup.value)" | ci log error
+      return {status: "not_found" error: $"No PR found for branch: ($lookup.value)"}
+    }
+
+    let pr = $prs | first
+    {
+      status: "success"
+      error: null
+      number: $pr.number
+      title: $pr.title
+      state: $pr.state
+      merged: $pr.merged
+      mergeable: $pr.mergeable
+      url: $pr.url
+      head_branch: $pr.headRefName
+      base_branch: $pr.baseRefName
+    }
+  } else {
+    # Get PR by number
+    let pr = try {
+      gh pr view $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
+    } catch {|err|
+      $"Failed to get PR info: ($err.msg)" | ci log error
+      return {status: "error" error: $err.msg}
+    }
+
+    {
+      status: "success"
+      error: null
+      number: $pr.number
+      title: $pr.title
+      state: $pr.state
+      merged: $pr.merged
+      mergeable: $pr.mergeable
+      url: $pr.url
+      head_branch: $pr.headRefName
+      base_branch: $pr.baseRefName
+    }
+  }
+}
+
 # Create a new pull request
 export def "ci github pr create" [
   title: string # PR title
