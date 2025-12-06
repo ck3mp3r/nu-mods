@@ -185,7 +185,88 @@ ci github pr create 'wip: feature' 'Draft description' --target develop --draft
 #   }
 # }
 
-# Test 6: List PRs with state filter
+# Test 6: Merge PR with squash (default)
+export def "test ci github pr merge squash default" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_merge_123_--squash_--auto": ({output: "Merged PR #123" exit_code: 0} | to json)
+    "MOCK_gh_pr_view_123_--json_headRefName": ({output: '{"headRefName":"feature/test"}' exit_code: 0} | to json)
+    "MOCK_gh_api_-X_DELETE__repos_{owner}_{repo}_git_refs_heads_feature_test": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr merge 123 | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success but got: ($result.status)"
+    assert ($result.pr_number == 123) $"Expected PR 123"
+    assert ($result.branch_deleted == true) $"Expected branch to be deleted"
+  }
+}
+
+# Test 7: Merge PR with merge method
+export def "test ci github pr merge with method" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_merge_456_--merge_--auto": ({output: "Merged PR #456" exit_code: 0} | to json)
+    "MOCK_gh_pr_view_456_--json_headRefName": ({output: '{"headRefName":"fix/bug"}' exit_code: 0} | to json)
+    "MOCK_gh_api_-X_DELETE__repos_{owner}_{repo}_git_refs_heads_fix_bug": ({output: "" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr merge 456 --method merge | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.branch_deleted == true) $"Expected branch deleted"
+  }
+}
+
+# Test 8: Merge PR without deleting branch
+export def "test ci github pr merge no delete" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_merge_789_--squash_--auto": ({output: "Merged PR #789" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr merge 789 --no-delete-branch | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "success") $"Expected success"
+    assert ($result.branch_deleted == false) $"Expected branch NOT deleted"
+  }
+}
+
+# Test 9: Merge PR failure
+export def "test ci github pr merge failure" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_gh_pr_merge_999_--squash_--auto": ({output: "Error: PR has conflicts" exit_code: 1} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/github.nu *
+ci github pr merge 999 | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert ($result.status == "failed") $"Expected failed status"
+    assert ($result.error != null) $"Expected error message"
+  }
+}
+
+# Test 10: List PRs with state filter
 export def "test ci github pr list with filter" [] {
   with-env {
     NU_TEST_MODE: "true"

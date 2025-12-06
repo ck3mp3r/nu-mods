@@ -159,6 +159,61 @@ export def "ci github pr update" [
   }
 }
 
+# Merge a pull request
+export def "ci github pr merge" [
+  pr_number: int # PR number to merge
+  --method: string = "squash" # Merge method: squash, merge, rebase
+  --delete-branch # Delete branch after merge (default: true)
+  --no-delete-branch # Don't delete branch after merge
+]: [
+  nothing -> record
+] {
+  $"Merging PR #($pr_number) using ($method)" | ci log info
+
+  # Determine if we should delete the branch
+  let should_delete = if $no_delete_branch {
+    false
+  } else {
+    true # Default to deleting branch
+  }
+
+  # Merge the PR
+  let merge_result = try {
+    match $method {
+      "squash" => { gh pr merge $pr_number --squash --auto }
+      "merge" => { gh pr merge $pr_number --merge --auto }
+      "rebase" => { gh pr merge $pr_number --rebase --auto }
+      _ => {
+        $"Invalid merge method: ($method). Use squash, merge, or rebase" | ci log error
+        error make {msg: $"Invalid merge method: ($method)"}
+      }
+    }
+    {status: "success" error: null}
+  } catch {|err|
+    $"Failed to merge PR #($pr_number): ($err.msg)" | ci log error
+    return {status: "failed" error: $err.msg pr_number: $pr_number}
+  }
+
+  # Delete branch if requested
+  if $should_delete {
+    try {
+      # Get PR details to find the branch name
+      let pr_info = (gh pr view $pr_number --json headRefName | from json)
+      let branch = $pr_info.headRefName
+
+      $"Deleting branch: ($branch)" | ci log info
+      gh api -X DELETE $"/repos/{owner}/{repo}/git/refs/heads/($branch)"
+
+      {status: "success" error: null pr_number: $pr_number branch_deleted: true}
+    } catch {|err|
+      $"PR merged but failed to delete branch: ($err.msg)" | ci log warning
+      {status: "success" error: null pr_number: $pr_number branch_deleted: false}
+    }
+  } else {
+    {status: "success" error: null pr_number: $pr_number branch_deleted: false}
+  }
+}
+
 # List pull requests
 export def "ci github pr list" [
   --state: string = "open" # PR state: open, closed, merged, all
