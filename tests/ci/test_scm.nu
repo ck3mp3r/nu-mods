@@ -5,8 +5,8 @@ use std/assert
 use ../mocks.nu *
 use ../../modules/ci/scm.nu *
 
-# Test 1: Feature branch with ticket ID from stdin
-export def "test ci scm branch feature with ticket from stdin" [] {
+# Test 1: Feature branch with ticket ID via --prefix flag
+export def "test ci scm branch feature with ticket prefix" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
@@ -18,7 +18,7 @@ export def "test ci scm branch feature with ticket from stdin" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'JIRA-1234' | ci scm branch 'add login' --feature
+'add login' | ci scm branch --feature --prefix 'JIRA-1234'
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -40,7 +40,7 @@ export def "test ci scm branch release with ticket" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'PROJ-500' | ci scm branch 'v2.1.0' --release
+'v2.1.0' | ci scm branch --release --prefix 'PROJ-500'
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -61,7 +61,7 @@ export def "test ci scm branch hotfix with custom base" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'SEC-999' | ci scm branch 'patch vulnerability' --hotfix --from production
+'patch vulnerability' | ci scm branch --hotfix --from production --prefix 'SEC-999'
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -83,7 +83,7 @@ export def "test ci scm branch fix without ticket" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-ci scm branch 'login bug' --fix
+'login bug' | ci scm branch --fix
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -104,7 +104,7 @@ export def "test ci scm branch sanitizes description" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'MAINT-100' | ci scm branch 'Update Dependencies AND Cleanup!!!' --chore
+'Update Dependencies AND Cleanup!!!' | ci scm branch --chore --prefix 'MAINT-100'
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -126,7 +126,7 @@ export def "test ci scm branch no checkout flag" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'TEST-789' | ci scm branch 'new thing' --feature --no-checkout
+'new thing' | ci scm branch --feature --no-checkout --prefix 'TEST-789'
 "
     let output = (nu -c $test_script | str join "\n")
 
@@ -144,7 +144,7 @@ export def "test ci scm branch error not git repo" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-ci scm branch 'test' --feature | to json
+'test' | ci scm branch --feature | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -168,7 +168,7 @@ export def "test ci scm branch defaults to feature" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-ci scm branch 'default test'
+'default test' | ci scm branch
 "
     let output = (nu -c $test_script | str join "\n")
 

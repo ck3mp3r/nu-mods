@@ -106,13 +106,14 @@ Create standardized branches with flow-based naming.
 
 **Usage:**
 ```nu
-ci scm branch <description> [flags]
+<description> | ci scm branch [flags]
 ```
 
-**Positional:**
-- `description` - Branch description (sanitized to kebab-case)
+**Input:**
+- `description` - Branch description via stdin (required, sanitized to kebab-case)
 
 **Flags:**
+- `--prefix`, `-p` - Optional prefix for branch name (e.g., ticket number)
 - `--feature` - Feature branch (default)
 - `--fix` - Bugfix branch
 - `--hotfix` - Hotfix branch
@@ -139,31 +140,31 @@ ci scm branch <description> [flags]
 
 ```nu
 # Feature branch (default)
-ci scm branch "add user login"
+"add user login" | ci scm branch
 # Creates: feature/add-user-login
 
-# With ticket prefix from stdin
-"JIRA-1234" | ci scm branch "add login" --feature
+# With ticket prefix
+"add login" | ci scm branch --prefix "JIRA-1234"
 # Creates: JIRA-1234/feature/add-login
 
 # Bugfix
-ci scm branch "login bug" --fix
+"login bug" | ci scm branch --fix
 # Creates: fix/login-bug
 
-# Hotfix from production
-"SEC-999" | ci scm branch "patch vulnerability" --hotfix --from production
+# Hotfix from production with prefix
+"patch vulnerability" | ci scm branch --hotfix --from production --prefix "SEC-999"
 # Creates: SEC-999/hotfix/patch-vulnerability
 
 # Release from develop
-ci scm branch "v2.1.0" --release --from develop
+"v2.1.0" | ci scm branch --release --from develop
 # Creates: release/v2.1.0
 
 # Chore without checkout
-ci scm branch "update dependencies" --chore --no-checkout
-# Creates: chore/update-dependencies-and-cleanup (no checkout)
+"update dependencies" | ci scm branch --chore --no-checkout
+# Creates: chore/update-dependencies (no checkout)
 
 # Use in workflows
-let result = (ci scm branch "add feature")
+let result = ("add feature" | ci scm branch)
 if $result.status == "success" {
   print $"Created branch: ($result.branch)"
 }

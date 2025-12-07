@@ -65,7 +65,7 @@ export def "ci scm config" [
 
 # Create a new git branch with standardized naming convention based on SCM flow types
 export def "ci scm branch" [
-  description?: string # Description for the branch
+  --prefix (-p): string # Optional prefix for branch name (e.g., "myproject" -> "myproject/feature/...")
   --release # Create a release branch
   --fix # Create a fix branch
   --hotfix # Create a hotfix branch
@@ -73,22 +73,15 @@ export def "ci scm branch" [
   --feature # Create a feature branch (default)
   --from: string = "main" # Base branch to branch from
   --no-checkout # Create but don't checkout
-]: [
-  string -> record
-  nothing -> record
-] {
+]: string -> record {
 
-  # Parse input - prefix can come from stdin or be empty
-  let prefix = if ($in | describe) == "string" {
-    $in | str trim
-  } else {
-    ""
-  }
+  # Get description from stdin
+  let description = $in | str trim
 
-  # Get description from argument
-  let desc = $description | default ""
+  # Get prefix value or default to empty
+  let prefix_val = $prefix | default ""
 
-  if $desc == "" {
+  if $description == "" {
     "Description is required" | ci log error
     return {status: "error" error: "Description is required" branch: null}
   }
@@ -112,15 +105,15 @@ export def "ci scm branch" [
 
   # Sanitize description: lowercase, replace spaces with hyphens, remove special chars
   let clean_desc = (
-    $desc
+    $description
     | str downcase
     | str replace --all ' ' '-'
     | str replace --all --regex '[^a-z0-9\-\.]' ''
   )
 
   # Construct branch name
-  let branch_name = if $prefix != "" {
-    $"($prefix)/($flow)/($clean_desc)"
+  let branch_name = if $prefix_val != "" {
+    $"($prefix_val)/($flow)/($clean_desc)"
   } else {
     $"($flow)/($clean_desc)"
   }
