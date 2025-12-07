@@ -406,12 +406,12 @@ export def "ci nix cache" [
     # Verify the path exists locally first
     let path_valid = (
       try {
-        nix path-info $path | complete | get exit_code
-        0
+        nix path-info $path
+        true
       } catch {
-        1
+        false
       }
-    ) == 0
+    )
 
     if (not $path_valid) {
       $"WARNING: Path ($path) is not valid in local store!" | ci log warning
