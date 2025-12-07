@@ -101,33 +101,47 @@ export def --wrapped input [...rest] {
   }
 }
 
-# Mock nix command - returns just the output string
+# Mock nix command - can return either a string (for backward compatibility) or complete-like record
 export def --wrapped nix [...rest] {
   let args = ($rest | str join "_" | str replace --all " " "_" | str replace --all "/" "_")
   let mock_var = $"MOCK_nix_($args)"
 
   if $mock_var in $env {
     let mock_data = ($env | get $mock_var | from json)
-    if $mock_data.exit_code != 0 {
-      error make {msg: $"Nix error: ($mock_data.output)"}
+
+    # Check if this is a command that should use 'complete' pattern (copy)
+    if ($rest | first) == "copy" {
+      # Return a record matching what 'complete' returns
+      {
+        exit_code: $mock_data.exit_code
+        stdout: (if "stdout" in $mock_data { $mock_data.stdout } else { "" })
+        stderr: (if "stderr" in $mock_data { $mock_data.stderr } else { $mock_data.output })
+      }
+    } else {
+      # Legacy behavior for other nix commands
+      if $mock_data.exit_code != 0 {
+        error make {msg: $"Nix error: ($mock_data.output)"}
+      }
+      $mock_data.output
     }
-    $mock_data.output
   } else {
     error make {msg: $"Mock not found: ($mock_var)"}
   }
 }
 
-# Mock cachix command - returns just the output string
+# Mock cachix command - returns a complete-like record {exit_code, stdout, stderr}
 export def --wrapped cachix [...rest] {
   let args = ($rest | str join "_" | str replace --all " " "_" | str replace --all "/" "_")
   let mock_var = $"MOCK_cachix_($args)"
 
   if $mock_var in $env {
     let mock_data = ($env | get $mock_var | from json)
-    if $mock_data.exit_code != 0 {
-      error make {msg: $"Cachix error: ($mock_data.output)"}
+    # Return a record matching what 'complete' returns
+    {
+      exit_code: $mock_data.exit_code
+      stdout: (if "stdout" in $mock_data { $mock_data.stdout } else { "" })
+      stderr: (if "stderr" in $mock_data { $mock_data.stderr } else { $mock_data.output })
     }
-    $mock_data.output
   } else {
     error make {msg: $"Mock not found: ($mock_var)"}
   }

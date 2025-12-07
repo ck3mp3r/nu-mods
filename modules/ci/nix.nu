@@ -377,13 +377,27 @@ export def "ci nix cache" [
   }
 
   # Determine cache type and push command once before processing paths
+  # In test mode, mocks return complete-like structure directly
+  # In production, we use complete to get the structure
   let push_fn = if ($cache =~ '^https?://.*\.cachix\.org') {
     let cache_name = ($cache | parse 'https://{name}.cachix.org' | get name.0)
-    {|path| cachix push $cache_name $path }
+    if ("NU_TEST_MODE" in $env) {
+      {|path| cachix push $cache_name $path }
+    } else {
+      {|path| cachix push $cache_name $path | complete }
+    }
   } else if ($cache =~ '^[a-z][a-z0-9+.-]*://') {
-    {|path| nix copy --to $cache $path }
+    if ("NU_TEST_MODE" in $env) {
+      {|path| nix copy --to $cache $path }
+    } else {
+      {|path| nix copy --to $cache $path | complete }
+    }
   } else {
-    {|path| cachix push $cache $path }
+    if ("NU_TEST_MODE" in $env) {
+      {|path| cachix push $cache $path }
+    } else {
+      {|path| cachix push $cache $path | complete }
+    }
   }
 
   $paths | each {|path|
@@ -432,29 +446,21 @@ export def "ci nix cache" [
       } else {
         $"Pushing ($path) to ($cache)" | ci log info
 
-        try {
-          # In test mode, mocks don't support 'complete', so just run directly
-          if ("NU_TEST_MODE" in $env) {
-            do $push_fn $path
-            $"Successfully pushed ($path) to ($cache)" | ci log info
-            {cache: $cache status: "success" error: null}
-          } else {
-            # In production, use complete to capture full output
-            let result = (do $push_fn $path | complete)
+        # Call push function - mocks return complete-like structure, real commands need wrapping
+        let result = (do $push_fn $path)
 
-            if $result.exit_code == 0 {
-              $"Successfully pushed ($path) to ($cache)" | ci log info
-              {cache: $cache status: "success" error: null}
-            } else {
-              let error_output = ([$result.stdout $result.stderr] | where {|x| ($x | is-not-empty) } | str join "\n")
-              $"Failed to push ($path):" | ci log error
-              $error_output | lines | each {|line| $line | ci log error }
-              {cache: $cache status: "failed" error: $error_output}
-            }
+        if $result.exit_code == 0 {
+          # Log stderr output even on success (cachix outputs progress to stderr)
+          if ($result.stderr | is-not-empty) {
+            $result.stderr | lines | each {|line| $line | ci log info }
           }
-        } catch {|err|
-          $"Failed to push ($path): ($err.msg)" | ci log error
-          {cache: $cache status: "failed" error: $err.msg}
+          $"Successfully pushed ($path) to ($cache)" | ci log info
+          {cache: $cache status: "success" error: null}
+        } else {
+          let error_output = ([$result.stdout $result.stderr] | where {|x| ($x | is-not-empty) } | str join "\n")
+          $"Failed to push ($path):" | ci log error
+          $error_output | lines | each {|line| $line | ci log error }
+          {cache: $cache status: "failed" error: $error_output}
         }
       }
     } else {
