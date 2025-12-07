@@ -85,12 +85,13 @@ export def "ci github pr check" [
 }
 
 # Get PR information by branch name or PR number
-export def "ci github pr info" [
-  identifier?: string # Branch name or PR number (default: current branch)
-]: [
+export def "ci github pr info" []: [
   nothing -> record
   string -> record
+  int -> record
 ] {
+  let identifier = $in
+
   # Determine what we're looking up
   let lookup = if ($identifier | is-empty) {
     # Get current branch
@@ -112,11 +113,11 @@ export def "ci github pr info" [
       }
     }
     {type: "branch" value: $current_branch}
-  } else if ($identifier | str trim | parse -r '^\d+$' | is-not-empty) {
-    # It's a PR number
+  } else if (($identifier | describe) == "int") {
+    # It's a PR number (integer)
     {type: "number" value: $identifier}
   } else {
-    # It's a branch name
+    # It's a branch name (string)
     {type: "branch" value: $identifier}
   }
 

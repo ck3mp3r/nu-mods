@@ -173,11 +173,14 @@ Get PR information by branch name or PR number.
 
 **Usage:**
 ```nu
-ci github pr info [identifier]
+<identifier> | ci github pr info
+ci github pr info  # Uses current branch
 ```
 
-**Positional:**
-- `identifier` - Branch name or PR number (optional, default: current branch)
+**Input:**
+- `int` - PR number
+- `string` - Branch name
+- `nothing` - Uses current branch
 
 **Returns:**
 ```nu
@@ -201,15 +204,21 @@ ci github pr info [identifier]
 ci github pr info
 
 # Get info by PR number
-ci github pr info 42
+42 | ci github pr info
 
 # Get info by branch name
-ci github pr info "feature/my-branch"
+"feature/my-branch" | ci github pr info
 
 # Use in workflows
 let pr = (ci github pr info)
 if $pr.status == "success" and $pr.merged {
   print "PR is already merged"
+}
+
+# Check if PR is mergeable
+let info = (89 | ci github pr info)
+if $info.mergeable == "CONFLICTING" {
+  print "PR has conflicts!"
 }
 ```
 

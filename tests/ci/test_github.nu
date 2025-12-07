@@ -167,7 +167,7 @@ export def "test ci github pr info by number" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr info 42 | to json
+42 | ci github pr info | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -188,7 +188,7 @@ export def "test ci github pr info by branch" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr info 'feature/new' | to json
+'feature/new' | ci github pr info | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
@@ -209,7 +209,7 @@ export def "test ci github pr info not found" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr info 'nonexistent' | to json
+'nonexistent' | ci github pr info | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
