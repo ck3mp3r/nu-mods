@@ -67,7 +67,8 @@ export def "ci github pr check" [
 
   let existing_prs = try {
     gh pr list --head $current_branch --base $target --json number,title,url | str trim
-  } catch {
+  } catch {|err|
+    $"Failed to list PRs for ($current_branch) -> ($target): ($err.msg)" | ci log error
     "[]"
   }
 
