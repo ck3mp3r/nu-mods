@@ -166,7 +166,7 @@ export def "ci scm branch" [
         # If hash changed, we rebased and need force push
         let rebased = $before_hash != $after_hash
 
-        print $"✅ Checked out existing branch and rebased: ($branch_name)"
+        $"Checked out existing branch and rebased: ($branch_name)" | ci log info
         {status: "success" error: null branch: $branch_name rebased: $rebased}
       } catch {|err|
         $"Failed to checkout/rebase branch: ($err.msg)" | ci log error
@@ -181,7 +181,7 @@ export def "ci scm branch" [
     $"Creating branch: ($branch_name) from ($from)" | ci log info
     try {
       git switch -c $branch_name
-      print $"✅ Successfully created and switched to branch: ($branch_name) from ($from)"
+      $"Successfully created and switched to branch: ($branch_name) from ($from)" | ci log info
       {status: "success" error: null branch: $branch_name rebased: false}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error

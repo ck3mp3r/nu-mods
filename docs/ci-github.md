@@ -6,6 +6,40 @@ GitHub PR and workflow management via GitHub CLI.
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) installed and authenticated
 
+## GitHub Actions Commands
+
+### `ci github summary`
+
+Add content to GitHub Actions step summary (markdown displayed in workflow run UI).
+
+**Usage:**
+```nu
+<content> | ci github summary [--newline]
+```
+
+**Input:**
+- `string` - Single line of content
+- `list<string>` - Multiple lines of content
+
+**Options:**
+- `--newline (-n)` - Add newlines after each line
+
+**Example:**
+```nu
+# Add single line
+"# Build Summary" | ci github summary
+
+# Add multiple lines
+["## Test Results", "- All tests passed", "- Coverage: 95%"] | ci github summary
+
+# Add with newlines
+["Line 1", "Line 2"] | ci github summary --newline
+```
+
+**Note:** Only works in GitHub Actions environment (requires `GITHUB_STEP_SUMMARY` environment variable).
+
+---
+
 ## Pull Request Commands
 
 ### `ci github pr check`
@@ -20,9 +54,29 @@ ci github pr check [--target <branch>]
 **Options:**
 - `--target` - Target branch (default: main)
 
+**Returns:**
+```nu
+# List of PR records
+[
+  {
+    number: int,
+    title: string,
+    url: string
+  }
+]
+```
+
 **Example:**
 ```nu
-ci github pr check
+# Check for PRs and get the list
+let prs = (ci github pr check)
+if ($prs | is-empty) {
+  print "No existing PRs found"
+} else {
+  print $"Found ($prs | length) PR(s)"
+}
+
+# Check against specific branch
 ci github pr check --target develop
 ```
 
@@ -34,20 +88,36 @@ Create a new pull request.
 
 **Usage:**
 ```nu
-ci github pr create <title> <body> [--target <branch>] [--draft]
+ci github pr create <title> [body] [--target <branch>] [--draft]
 ```
 
 **Positional:**
 - `title` - PR title
-- `body` - PR description
+- `body` - PR description (optional)
 
 **Options:**
 - `--target` - Target branch (default: main)
 - `--draft` - Create as draft PR
 
+**Returns:**
+```nu
+{
+  status: "success" | "error",
+  error: string?,           # Error message if status is "error"
+  number: int?,            # PR number (null on error)
+  url: string?,            # PR URL (null on error)
+  title: string,           # PR title
+  draft: bool              # Whether created as draft
+}
+```
+
 **Example:**
 ```nu
-ci github pr create "feat: add login" "Implements user authentication" --target main
+# Create regular PR
+let pr = (ci github pr create "feat: add login" "Implements user authentication" --target main)
+print $"Created PR #($pr.number): ($pr.url)"
+
+# Create draft PR
 ci github pr create "wip: feature" "Work in progress" --draft
 ```
 
@@ -59,17 +129,40 @@ List pull requests.
 
 **Usage:**
 ```nu
-ci github pr list [--state <state>]
+ci github pr list [--state <state>] [--author <username>] [--limit <n>]
 ```
 
 **Options:**
 - `--state` - Filter by state: open, closed, merged, all (default: open)
+- `--author` - Filter by author username
+- `--limit` - Maximum number of PRs to list (default: 30)
+
+**Returns:**
+```nu
+# List of PR records
+[
+  {
+    number: int,
+    title: string,
+    author: { login: string }
+  }
+]
+```
 
 **Example:**
 ```nu
-ci github pr list
+# List all open PRs
+let prs = (ci github pr list)
+print $"Found ($prs | length) open PRs"
+
+# List merged PRs
 ci github pr list --state merged
-ci github pr list --state all
+
+# List PRs by specific author
+ci github pr list --author "username"
+
+# List with custom limit
+ci github pr list --limit 50
 ```
 
 ---
@@ -124,11 +217,11 @@ if $pr.status == "success" and $pr.merged {
 
 ### `ci github pr merge`
 
-Merge a pull request with auto squash and optional branch deletion.
+Merge a pull request (branch deletion handled by repository settings).
 
 **Usage:**
 ```nu
-ci github pr merge <number> [--method <method>] [--delete-branch|--no-delete-branch]
+ci github pr merge <number> [--method <method>] [--auto]
 ```
 
 **Positional:**
@@ -136,29 +229,33 @@ ci github pr merge <number> [--method <method>] [--delete-branch|--no-delete-bra
 
 **Options:**
 - `--method` - Merge method: squash (default), merge, rebase
-- `--delete-branch` - Delete branch after merge (default)
-- `--no-delete-branch` - Keep branch after merge
+- `--auto` - Enable auto-merge (merge when checks pass, default: merge immediately)
 
 **Returns:**
 ```nu
 {
-  status: "success" | "error",
-  error: string?,           # Error message if status is "error"
-  pr_number: int,          # PR number that was merged
-  branch_deleted: bool     # Whether branch was deleted
+  status: "success" | "failed",
+  error: string?,           # Error message if status is "failed"
+  pr_number: int           # PR number that was merged
 }
 ```
 
 **Example:**
 ```nu
-# Squash merge with branch deletion (default)
-ci github pr merge 42
+# Squash merge immediately (default)
+let result = (ci github pr merge 42)
+if $result.status == "success" {
+  print "PR merged successfully"
+}
 
-# Merge commit without deleting branch
-ci github pr merge 42 --method merge --no-delete-branch
+# Merge commit
+ci github pr merge 42 --method merge
 
-# Rebase merge with branch deletion
-ci github pr merge 42 --method rebase
+# Enable auto-merge (merges when checks pass)
+ci github pr merge 42 --auto
+
+# Rebase merge with auto-merge
+ci github pr merge 42 --method rebase --auto
 ```
 
 ---
@@ -179,10 +276,26 @@ ci github pr update <number> [--title <title>] [--body <body>]
 - `--title` - New title
 - `--body` - New description
 
+**Returns:**
+```nu
+{
+  status: "success" | "error" | "failed",
+  error: string?,           # Error message if not success
+  pr_number: int,          # PR number
+  title: string?,          # New title (if provided)
+  body: string?            # New body (if provided)
+}
+```
+
 **Example:**
 ```nu
-ci github pr update 42 --title "feat: improved login"
+# Update title
+let result = (ci github pr update 42 --title "feat: improved login")
+
+# Update body
 ci github pr update 42 --body "Updated implementation"
+
+# Update both
 ci github pr update 42 --title "new title" --body "new body"
 ```
 
@@ -194,19 +307,38 @@ List workflow runs.
 
 **Usage:**
 ```nu
-ci github workflow list [--status <status>]
+ci github workflow list [--status <status>] [--limit <n>]
 ```
 
 **Options:**
 - `--status` - Filter by status: success, failure, cancelled, in_progress
+- `--limit` - Maximum number of runs to list (default: 20)
 
-**Output:**
-- Status icons: ✓ (success), ✗ (failure), ○ (in_progress/other)
+**Returns:**
+```nu
+# List of workflow run records
+[
+  {
+    databaseId: int,
+    status: string,          # "completed", "in_progress", etc.
+    conclusion: string?,     # "success", "failure", null if in progress
+    name: string,           # Workflow name
+    headBranch: string      # Branch name
+  }
+]
+```
 
 **Example:**
 ```nu
-ci github workflow list
-ci github workflow list --status failure
+# List recent workflow runs
+let runs = (ci github workflow list)
+print $"Found ($runs | length) workflow runs"
+
+# Filter by status
+let failed = (ci github workflow list --status failure)
+for run in $failed {
+  print $"Failed run #($run.databaseId): ($run.name)"
+}
 ```
 
 ---
@@ -223,9 +355,30 @@ ci github workflow view <run_id>
 **Positional:**
 - `run_id` - Workflow run ID
 
+**Returns:**
+```nu
+{
+  status: "success" | "error",
+  error: string?,          # Error message if status is "error"
+  run_id: int,            # Workflow run ID
+  name: string?,          # Workflow name
+  branch: string?,        # Branch name
+  run_status: string?,    # "completed", "in_progress", etc.
+  conclusion: string?,    # "success", "failure", null
+  created_at: string?,    # ISO 8601 timestamp
+  jobs: list              # List of job records
+}
+```
+
 **Example:**
 ```nu
-ci github workflow view 12345
+# View workflow details
+let run = (ci github workflow view 12345)
+if $run.status == "success" {
+  print $"Workflow: ($run.name)"
+  print $"Status: ($run.conclusion)"
+  print $"Jobs: ($run.jobs | length)"
+}
 ```
 
 ---
@@ -261,9 +414,22 @@ ci github workflow cancel <run_id>
 **Positional:**
 - `run_id` - Workflow run ID
 
+**Returns:**
+```nu
+{
+  status: "success" | "failed",
+  error: string?,          # Error message if status is "failed"
+  run_id: int             # Workflow run ID
+}
+```
+
 **Example:**
 ```nu
-ci github workflow cancel 12345
+# Cancel a workflow
+let result = (ci github workflow cancel 12345)
+if $result.status == "success" {
+  print "Workflow cancelled"
+}
 ```
 
 ---
@@ -280,9 +446,22 @@ ci github workflow rerun <run_id>
 **Positional:**
 - `run_id` - Workflow run ID
 
+**Returns:**
+```nu
+{
+  status: "success" | "failed",
+  error: string?,          # Error message if status is "failed"
+  run_id: int             # Workflow run ID
+}
+```
+
 **Example:**
 ```nu
-ci github workflow rerun 12345
+# Re-run a workflow
+let result = (ci github workflow rerun 12345)
+if $result.status == "success" {
+  print "Workflow re-run started"
+}
 ```
 
 ## Workflow Examples
@@ -291,19 +470,30 @@ ci github workflow rerun 12345
 
 ```nu
 # 1. Check for existing PR
-ci github pr check --target main
+let existing = (ci github pr check --target main)
 
 # 2. Create PR if none exists
-ci github pr create "feat: new feature" "Detailed description" --target main
+let pr = if ($existing | is-empty) {
+  ci github pr create "feat: new feature" "Detailed description" --target main
+} else {
+  $existing | first
+}
 
-# 3. List all open PRs
-ci github pr list
+# 3. Get PR info
+let info = (ci github pr info $pr.number)
+if $info.mergeable == "CONFLICTING" {
+  print "PR has conflicts, cannot merge"
+  exit 1
+}
 
 # 4. Update PR if needed
-ci github pr update 5 --title "feat: improved feature"
+ci github pr update $pr.number --title "feat: improved feature"
 
-# 5. Merge PR with squash and delete branch
-ci github pr merge 5
+# 5. Merge PR with squash
+let merge_result = (ci github pr merge $pr.number)
+if $merge_result.status == "success" {
+  print "Successfully merged!"
+}
 ```
 
 ### Automated Flake Update Workflow
@@ -319,26 +509,46 @@ ci github pr merge $pr.number
 ### Workflow Management
 
 ```nu
-# List failed workflows
-ci github workflow list --status failure
+# List failed workflows and re-run them
+let failed = (ci github workflow list --status failure)
+for run in $failed {
+  print $"Re-running failed workflow: ($run.name) \(#($run.databaseId)\)"
+  ci github workflow rerun $run.databaseId
+}
 
-# View details
-ci github workflow view 12345
+# View details of a specific run
+let run = (ci github workflow view 12345)
+if $run.conclusion == "failure" {
+  print $"Workflow failed: ($run.name)"
+  print $"Jobs: ($run.jobs | length)"
+}
 
-# Get logs
+# Get logs (outputs directly to stdout)
 ci github workflow logs 12345
 
-# Re-run if needed
-ci github workflow rerun 12345
+# Cancel in-progress runs
+let in_progress = (ci github workflow list --status in_progress)
+for run in $in_progress {
+  ci github workflow cancel $run.databaseId
+}
 ```
 
-## Logging
+## Output and Logging
 
-Uses `std/log` for operation logging. Set `NU_LOG_LEVEL`:
+All functions return structured data (records or lists) for easy integration into workflows.
+
+Informational messages are logged to stderr using `ci log`, which does not interfere with structured output:
 
 ```nu
-$env.NU_LOG_LEVEL = "INFO"   # Show operations
-$env.NU_LOG_LEVEL = "ERROR"  # Errors only
+# Example: Use returned data in workflows
+let pr = (ci github pr create "feat: new feature" "Description")
+if $pr.status == "success" {
+  print $"Created PR #($pr.number)"
+  ci github pr merge $pr.number
+}
+
+# Logs go to stderr, data goes to stdout
+let prs = (ci github pr list --state open)  # Returns list of PRs
 ```
 
 ## Error Handling

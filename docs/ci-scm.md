@@ -185,10 +185,13 @@ if $result.status == "success" {
 ## Behavior
 
 1. **Validation:** Checks if in a git repository
-2. **Base Branch:** Switches to and updates base branch
+2. **Base Branch:** Switches to and updates base branch (if different from current)
 3. **Sanitization:** Converts description to kebab-case
-4. **Creation:** Creates new branch from base
-5. **Checkout:** Checks out new branch (unless `--no-checkout`)
+4. **Branch Check:** Checks if branch already exists
+   - If `--reuse` is provided and branch exists: checkout and rebase
+   - If branch exists without `--reuse`: returns error
+   - If branch doesn't exist: creates it
+5. **Checkout:** Always switches to the branch
 
 ## Logging
 

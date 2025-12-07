@@ -54,13 +54,13 @@ export def "ci github pr" [] {
 export def "ci github pr check" [
   --target: string = "main" # Target branch to check against
 ]: [
-  nothing -> nothing
+  nothing -> list
 ] {
   let current_branch = try {
     git rev-parse --abbrev-ref HEAD | str trim
   } catch {
     "Not in a git repository" | ci log error
-    return
+    return []
   }
 
   $"Checking for existing PRs: ($current_branch) -> ($target)" | ci log info
@@ -74,11 +74,13 @@ export def "ci github pr check" [
   if $existing_prs != "[]" {
     let prs = ($existing_prs | from json)
     for pr in $prs {
-      print $"✓ Found PR #($pr.number): ($pr.title)"
-      print $"  URL: ($pr.url)"
+      $"Found PR #($pr.number): ($pr.title)" | ci log info
+      $"  URL: ($pr.url)" | ci log info
     }
+    $prs
   } else {
-    print $"No existing PR found for ($current_branch) -> ($target)"
+    $"No existing PR found for ($current_branch) -> ($target)" | ci log info
+    []
   }
 }
 
@@ -261,11 +263,11 @@ export def "ci github pr create" [
   }
 
   if $draft {
-    print $"✓ Created draft PR #($pr_number)"
+    $"Created draft PR #($pr_number)" | ci log info
   } else {
-    print $"✓ Created PR #($pr_number)"
+    $"Created PR #($pr_number)" | ci log info
   }
-  print $"  ($url)"
+  $"  ($url)" | ci log info
 
   {
     status: "success"
@@ -283,7 +285,7 @@ export def "ci github pr update" [
   --title: string # New title
   --body: string # New description
 ]: [
-  nothing -> nothing
+  nothing -> record
 ] {
   $"Updating PR #($pr_number)" | ci log info
 
@@ -292,7 +294,13 @@ export def "ci github pr update" [
     gh repo view --json owner,name | from json
   } catch {|err|
     $"Failed to get repo info: ($err.msg)" | ci log error
-    return
+    return {
+      status: "error"
+      error: $err.msg
+      pr_number: $pr_number
+      title: $title
+      body: $body
+    }
   }
 
   let owner = $repo.owner.login
@@ -308,9 +316,23 @@ export def "ci github pr update" [
       gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"body=($body)" | ignore
     }
 
-    print $"✓ Updated PR #($pr_number)"
+    $"Updated PR #($pr_number)" | ci log info
+    {
+      status: "success"
+      error: null
+      pr_number: $pr_number
+      title: $title
+      body: $body
+    }
   } catch {|err|
     $"Failed to update PR: ($err.msg)" | ci log error
+    {
+      status: "failed"
+      error: $err.msg
+      pr_number: $pr_number
+      title: $title
+      body: $body
+    }
   }
 }
 
@@ -318,54 +340,40 @@ export def "ci github pr update" [
 export def "ci github pr merge" [
   pr_number: int # PR number to merge
   --method: string = "squash" # Merge method: squash, merge, rebase
-  --delete-branch # Delete branch after merge (default: true)
-  --no-delete-branch # Don't delete branch after merge
+  --auto # Enable auto-merge (merge automatically when checks pass, default: merge immediately)
 ]: [
   nothing -> record
 ] {
   $"Merging PR #($pr_number) using ($method)" | ci log info
 
-  # Determine if we should delete the branch
-  let should_delete = if $no_delete_branch {
-    false
-  } else {
-    true # Default to deleting branch
-  }
-
-  # Merge the PR
-  let merge_result = try {
-    match $method {
-      "squash" => { gh pr merge $pr_number --squash --auto }
-      "merge" => { gh pr merge $pr_number --merge --auto }
-      "rebase" => { gh pr merge $pr_number --rebase --auto }
-      _ => {
-        $"Invalid merge method: ($method). Use squash, merge, or rebase" | ci log error
-        error make {msg: $"Invalid merge method: ($method)"}
+  # Merge the PR - branch deletion handled by repo settings
+  try {
+    if $auto {
+      match $method {
+        "squash" => { gh pr merge $pr_number --squash --auto }
+        "merge" => { gh pr merge $pr_number --merge --auto }
+        "rebase" => { gh pr merge $pr_number --rebase --auto }
+        _ => {
+          $"Invalid merge method: ($method). Use squash, merge, or rebase" | ci log error
+          error make {msg: $"Invalid merge method: ($method)"}
+        }
+      }
+    } else {
+      match $method {
+        "squash" => { gh pr merge $pr_number --squash }
+        "merge" => { gh pr merge $pr_number --merge }
+        "rebase" => { gh pr merge $pr_number --rebase }
+        _ => {
+          $"Invalid merge method: ($method). Use squash, merge, or rebase" | ci log error
+          error make {msg: $"Invalid merge method: ($method)"}
+        }
       }
     }
-    {status: "success" error: null}
+    $"Merged PR #($pr_number)" | ci log info
+    {status: "success" error: null pr_number: $pr_number}
   } catch {|err|
     $"Failed to merge PR #($pr_number): ($err.msg)" | ci log error
-    return {status: "failed" error: $err.msg pr_number: $pr_number}
-  }
-
-  # Delete branch if requested
-  if $should_delete {
-    try {
-      # Get PR details to find the branch name
-      let pr_info = (gh pr view $pr_number --json headRefName | from json)
-      let branch = $pr_info.headRefName
-
-      $"Deleting branch: ($branch)" | ci log info
-      gh api -X DELETE $"/repos/{owner}/{repo}/git/refs/heads/($branch)"
-
-      {status: "success" error: null pr_number: $pr_number branch_deleted: true}
-    } catch {|err|
-      $"PR merged but failed to delete branch: ($err.msg)" | ci log warning
-      {status: "success" error: null pr_number: $pr_number branch_deleted: false}
-    }
-  } else {
-    {status: "success" error: null pr_number: $pr_number branch_deleted: false}
+    {status: "failed" error: $err.msg pr_number: $pr_number}
   }
 }
 
@@ -375,7 +383,7 @@ export def "ci github pr list" [
   --author: string # Filter by author
   --limit: int = 30 # Max number of PRs to list
 ]: [
-  nothing -> nothing
+  nothing -> list
 ] {
   $"Listing PRs \(state: ($state)\)" | ci log info
 
@@ -387,16 +395,18 @@ export def "ci github pr list" [
     }
   } catch {|err|
     $"Failed to list PRs: ($err.msg)" | ci log error
-    return
+    return []
   }
 
   if ($prs | is-empty) {
-    print $"No PRs found \(state: ($state)\)"
+    $"No PRs found \(state: ($state)\)" | ci log info
   } else {
     for pr in $prs {
-      print $"#($pr.number) ($pr.title) - @($pr.author.login)"
+      $"#($pr.number) ($pr.title) - @($pr.author.login)" | ci log info
     }
   }
+
+  $prs
 }
 
 # GitHub workflow operations - show help
@@ -409,7 +419,7 @@ export def "ci github workflow list" [
   --status: string # Filter by status: success, failure, in_progress, completed
   --limit: int = 20 # Max number of runs to list
 ]: [
-  nothing -> nothing
+  nothing -> list
 ] {
   "Listing workflow runs" | ci log info
 
@@ -421,11 +431,11 @@ export def "ci github workflow list" [
     }
   } catch {|err|
     $"Failed to list workflow runs: ($err.msg)" | ci log error
-    return
+    return []
   }
 
   if ($runs | is-empty) {
-    print "No workflow runs found"
+    "No workflow runs found" | ci log info
   } else {
     for run in $runs {
       let status_icon = match $run.conclusion {
@@ -433,16 +443,18 @@ export def "ci github workflow list" [
         "failure" => "✗"
         _ => "○"
       }
-      print $"($status_icon) Run #($run.databaseId) - ($run.name) (($run.headBranch)) - ($run.status)"
+      $"($status_icon) Run #($run.databaseId) - ($run.name) (($run.headBranch)) - ($run.status)" | ci log info
     }
   }
+
+  $runs
 }
 
 # View specific workflow run details
 export def "ci github workflow view" [
   run_id: int # Workflow run ID
 ]: [
-  nothing -> nothing
+  nothing -> record
 ] {
   $"Viewing workflow run #($run_id)" | ci log info
 
@@ -450,25 +462,47 @@ export def "ci github workflow view" [
     gh run view $run_id --json databaseId,status,conclusion,name,headBranch,createdAt,jobs | from json
   } catch {|err|
     $"Failed to view workflow run: ($err.msg)" | ci log error
-    return
+    return {
+      status: "error"
+      error: $err.msg
+      run_id: $run_id
+      name: null
+      branch: null
+      run_status: null
+      conclusion: null
+      created_at: null
+      jobs: []
+    }
   }
 
-  print $"Run #($run.databaseId): ($run.name)"
-  print $"  Branch: ($run.headBranch)"
-  print $"  Status: ($run.status)"
-  print $"  Conclusion: ($run.conclusion)"
-  print $"  Created: ($run.createdAt)"
+  $"Run #($run.databaseId): ($run.name)" | ci log info
+  $"  Branch: ($run.headBranch)" | ci log info
+  $"  Status: ($run.status)" | ci log info
+  $"  Conclusion: ($run.conclusion)" | ci log info
+  $"  Created: ($run.createdAt)" | ci log info
 
   if ($run.jobs | is-not-empty) {
-    print "\nJobs:"
+    "\nJobs:" | ci log info
     for job in $run.jobs {
       let job_icon = match $job.conclusion {
         "success" => "✓"
         "failure" => "✗"
         _ => "○"
       }
-      print $"  ($job_icon) ($job.name) - ($job.status)"
+      $"  ($job_icon) ($job.name) - ($job.status)" | ci log info
     }
+  }
+
+  {
+    status: "success"
+    error: null
+    run_id: $run.databaseId
+    name: $run.name
+    branch: $run.headBranch
+    run_status: $run.status
+    conclusion: $run.conclusion
+    created_at: $run.createdAt
+    jobs: $run.jobs
   }
 }
 
@@ -491,15 +525,17 @@ export def "ci github workflow logs" [
 export def "ci github workflow cancel" [
   run_id: int # Workflow run ID to cancel
 ]: [
-  nothing -> nothing
+  nothing -> record
 ] {
   $"Canceling workflow run #($run_id)" | ci log info
 
   try {
     gh run cancel $run_id
-    print $"✓ Canceled workflow run #($run_id)"
+    $"✓ Canceled workflow run #($run_id)" | ci log info
+    {status: "success" error: null run_id: $run_id}
   } catch {|err|
     $"Failed to cancel workflow run: ($err.msg)" | ci log error
+    {status: "failed" error: $err.msg run_id: $run_id}
   }
 }
 
@@ -507,14 +543,16 @@ export def "ci github workflow cancel" [
 export def "ci github workflow rerun" [
   run_id: int # Workflow run ID to rerun
 ]: [
-  nothing -> nothing
+  nothing -> record
 ] {
   $"Re-running workflow #($run_id)" | ci log info
 
   try {
     gh run rerun $run_id
-    print $"✓ Re-running workflow #($run_id)"
+    $"✓ Re-running workflow #($run_id)" | ci log info
+    {status: "success" error: null run_id: $run_id}
   } catch {|err|
     $"Failed to rerun workflow: ($err.msg)" | ci log error
+    {status: "failed" error: $err.msg run_id: $run_id}
   }
 }
