@@ -307,7 +307,8 @@ export def "ci scm commit" [
     # Get current branch name
     let current_branch = try {
       git rev-parse --abbrev-ref HEAD | str trim
-    } catch {
+    } catch {|err|
+      $"Failed to get current branch: ($err.msg)" | ci log error
       "HEAD"
     }
 
