@@ -102,7 +102,7 @@ use modules/ci/nix.nu *
 export def "test ci nix cache push single path" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
+    "MOCK_cachix_push_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -144,7 +144,7 @@ export def "test ci nix build and push pipeline" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_build_.#pkg1_--print-out-paths_--no-link_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
-    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg1": ({output: "" exit_code: 0} | to json)
+    "MOCK_cachix_push_cachix__nix_store_abc-pkg1": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -205,7 +205,7 @@ export def "test ci nix cache check and push" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "" exit_code: 1} | to json)
-    "MOCK_nix_copy_--to_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
+    "MOCK_cachix_push_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *

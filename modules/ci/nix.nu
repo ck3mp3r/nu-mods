@@ -395,7 +395,22 @@ export def "ci nix cache" [
       $"Pushing ($path) to ($cache)" | ci log info
 
       try {
-        nix copy --to $cache $path
+        # Use appropriate tool based on cache type
+        match $cache {
+          # Non-Cachix URIs: s3://, file://, ssh://, https://other.com, etc.
+          $uri if ($uri =~ '^[a-z][a-z0-9+.-]*://' and $uri !~ '\.cachix\.org') => {
+            nix copy --to $uri $path
+          }
+          # Cachix (URL or plain name)
+          $cachix => {
+            let cache_name = if ($cachix =~ '^https?://.*\.cachix\.org') {
+              $cachix | parse 'https://{name}.cachix.org' | get name.0
+            } else {
+              $cachix
+            }
+            cachix push $cache_name $path
+          }
+        }
         {cache: $cache status: "success" error: null}
       } catch {|err|
         $"Failed to push ($path): ($err.msg)" | ci log error
