@@ -408,7 +408,8 @@ export def "ci nix cache" [
       try {
         nix path-info $path
         true
-      } catch {
+      } catch {|err|
+        $"Failed to validate path ($path): ($err.msg)" | ci log error
         false
       }
     )
