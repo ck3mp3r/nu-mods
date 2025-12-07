@@ -144,7 +144,8 @@ export def "ci scm branch" [
   # Note: In tests, mocks throw errors for non-zero exit codes, so we catch that
   let branch_exists = try {
     git rev-parse --verify $branch_name | complete | get exit_code
-  } catch {
+  } catch {|err|
+    $"Branch ($branch_name) does not exist: ($err.msg)" | ci log info
     128 # Branch doesn't exist (mock threw error)
   }
 

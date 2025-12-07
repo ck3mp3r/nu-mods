@@ -23,7 +23,8 @@ def normalize-flakes []: [list<string> -> list<string> string -> list<string> no
 def detect-system []: [nothing -> string] {
   try {
     nix eval --impure --expr 'builtins.currentSystem' | str trim | str replace -a '"' ''
-  } catch {
+  } catch {|err|
+    $"Failed to detect system: ($err.msg)" | ci log warning
     "unknown"
   }
 }
