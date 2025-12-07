@@ -400,19 +400,26 @@ export def "ci nix cache" [
       {cached: null upstream: null}
     }
 
-    # Push to target cache if not dry-run
+    # Push to target cache if not dry-run AND not already in upstream
     let push_result = if (not $dry_run) {
-      $"Pushing ($path) to ($cache)" | ci log info
+      # Skip paths already in upstream cache
+      if ($upstream_check.cached == true) {
+        $"Skipping ($path) - already in upstream cache" | ci log info
+        {cache: $cache status: "skipped" error: null}
+      } else {
+        $"Pushing ($path) to ($cache)" | ci log info
 
-      try {
-        do $push_fn $path
-        {cache: $cache status: "success" error: null}
-      } catch {|err|
-        $"Failed to push ($path): ($err.msg)" | ci log error
-        {cache: $cache status: "failed" error: $err.msg}
+        try {
+          do $push_fn $path
+          $"Successfully pushed ($path) to ($cache)" | ci log info
+          {cache: $cache status: "success" error: null}
+        } catch {|err|
+          $"Failed to push ($path): ($err.msg)" | ci log error
+          {cache: $cache status: "failed" error: $err.msg}
+        }
       }
     } else {
-      {cache: null status: "success" error: null}
+      {cache: null status: "dry-run" error: null}
     }
 
     # Combine results
