@@ -369,6 +369,16 @@ export def "ci nix cache" [
     return []
   }
 
+  # Determine cache type and push command once before processing paths
+  let push_fn = if ($cache =~ '^https?://.*\.cachix\.org') {
+    let cache_name = ($cache | parse 'https://{name}.cachix.org' | get name.0)
+    {|path| cachix push $cache_name $path }
+  } else if ($cache =~ '^[a-z][a-z0-9+.-]*://') {
+    {|path| nix copy --to $cache $path }
+  } else {
+    {|path| cachix push $cache $path }
+  }
+
   $paths | each {|path|
     # Check upstream cache if provided
     let upstream_check = if ($upstream | is-not-empty) {
@@ -395,7 +405,7 @@ export def "ci nix cache" [
       $"Pushing ($path) to ($cache)" | ci log info
 
       try {
-        nix copy --to $cache $path
+        do $push_fn $path
         {cache: $cache status: "success" error: null}
       } catch {|err|
         $"Failed to push ($path): ($err.msg)" | ci log error
