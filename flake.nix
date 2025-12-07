@@ -56,7 +56,7 @@
                 # Copy dependencies at the same level (as sibling modules)
                 ${pkgs.lib.concatMapStringsSep "\n" (dep: ''
                     if [ -d "${dep}/share/nushell/modules" ]; then
-                      cp -r "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
+                      cp -rn "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
                     fi
                   '')
                   dependencies}
@@ -118,7 +118,7 @@
               # Note: Dependencies are already included in each package
               ${pkgs.lib.concatMapStringsSep "\n" (pkg: ''
                   if [ -d "${pkg}/share/nushell/modules" ]; then
-                    cp -r "${pkg}"/share/nushell/modules/* $out/share/nushell/modules/
+                    cp -rn "${pkg}"/share/nushell/modules/* $out/share/nushell/modules/
                   fi
                 '') [
                   self.packages.${system}.common
