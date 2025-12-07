@@ -140,7 +140,7 @@ export def "test ci github pr info current branch" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "feature/test" exit_code: 0} | to json)
-    "MOCK_gh_pr_list_--head_feature_test_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[{"number":100,"title":"Test Feature","state":"OPEN","merged":false,"mergeable":"MERGEABLE","url":"https://github.com/user/repo/pull/100","headRefName":"feature/test","baseRefName":"main"}]' exit_code: 0} | to json)
+    "MOCK_gh_pr_list_--head_feature_test_--json_number,title,state,mergedAt,mergeable,url,headRefName,baseRefName": ({output: '[{"number":100,"title":"Test Feature","state":"OPEN","mergedAt":null,"mergeable":"MERGEABLE","url":"https://github.com/user/repo/pull/100","headRefName":"feature/test","baseRefName":"main"}]' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -162,7 +162,7 @@ ci github pr info | to json
 export def "test ci github pr info by number" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_view_42_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '{"number":42,"title":"Fix Bug","state":"MERGED","merged":true,"mergeable":"UNKNOWN","url":"https://github.com/user/repo/pull/42","headRefName":"fix/bug","baseRefName":"main"}' exit_code: 0} | to json)
+    "MOCK_gh_pr_view_42_--json_number,title,state,mergedAt,mergeable,url,headRefName,baseRefName": ({output: '{"number":42,"title":"Fix Bug","state":"MERGED","mergedAt":"2024-01-01T10:00:00Z","mergeable":"UNKNOWN","url":"https://github.com/user/repo/pull/42","headRefName":"fix/bug","baseRefName":"main"}' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -183,7 +183,7 @@ use modules/ci/github.nu *
 export def "test ci github pr info by branch" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_list_--head_feature_new_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[{"number":99,"title":"New Feature","state":"OPEN","merged":false,"mergeable":"CONFLICTING","url":"https://github.com/user/repo/pull/99","headRefName":"feature/new","baseRefName":"develop"}]' exit_code: 0} | to json)
+    "MOCK_gh_pr_list_--head_feature_new_--json_number,title,state,mergedAt,mergeable,url,headRefName,baseRefName": ({output: '[{"number":99,"title":"New Feature","state":"OPEN","mergedAt":null,"mergeable":"CONFLICTING","url":"https://github.com/user/repo/pull/99","headRefName":"feature/new","baseRefName":"develop"}]' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -204,7 +204,7 @@ use modules/ci/github.nu *
 export def "test ci github pr info not found" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_list_--head_nonexistent_--json_number,title,state,merged,mergeable,url,headRefName,baseRefName": ({output: '[]' exit_code: 0} | to json)
+    "MOCK_gh_pr_list_--head_nonexistent_--json_number,title,state,mergedAt,mergeable,url,headRefName,baseRefName": ({output: '[]' exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *

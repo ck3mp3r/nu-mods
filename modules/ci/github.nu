@@ -127,7 +127,7 @@ export def "ci github pr info" []: [
   if $lookup.type == "branch" {
     # Find PR by branch name
     let prs = try {
-      gh pr list --head $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
+      gh pr list --head $lookup.value --json number,title,state,mergedAt,mergeable,url,headRefName,baseRefName | from json
     } catch {|err|
       $"Failed to get PR info: ($err.msg)" | ci log error
       return {
@@ -167,7 +167,7 @@ export def "ci github pr info" []: [
       number: $pr.number
       title: $pr.title
       state: $pr.state
-      merged: $pr.merged
+      merged: ($pr.mergedAt != null)
       mergeable: $pr.mergeable
       url: $pr.url
       head_branch: $pr.headRefName
@@ -176,12 +176,29 @@ export def "ci github pr info" []: [
   } else {
     # Get PR by number
     let pr = try {
-      gh pr view $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
+      gh pr view $lookup.value --json number,title,state,mergedAt,mergeable,url,headRefName,baseRefName | from json
     } catch {|err|
       $"Failed to get PR info: ($err.msg)" | ci log error
       return {
         status: "error"
         error: $err.msg
+        number: null
+        title: null
+        state: null
+        merged: null
+        mergeable: null
+        url: null
+        head_branch: null
+        base_branch: null
+      }
+    }
+
+    # Check if PR was found
+    if ($pr | is-empty) {
+      $"No PR found for number: ($lookup.value)" | ci log error
+      return {
+        status: "not_found"
+        error: $"PR #($lookup.value) not found"
         number: null
         title: null
         state: null
@@ -199,7 +216,7 @@ export def "ci github pr info" []: [
       number: $pr.number
       title: $pr.title
       state: $pr.state
-      merged: $pr.merged
+      merged: ($pr.mergedAt != null)
       mergeable: $pr.mergeable
       url: $pr.url
       head_branch: $pr.headRefName
