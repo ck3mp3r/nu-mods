@@ -96,7 +96,18 @@ export def "ci github pr info" [
       git rev-parse --abbrev-ref HEAD | str trim
     } catch {
       $"Failed to get current branch" | ci log error
-      return {status: "error" error: "Not in a git repository"}
+      return {
+        status: "error"
+        error: "Not in a git repository"
+        number: null
+        title: null
+        state: null
+        merged: null
+        mergeable: null
+        url: null
+        head_branch: null
+        base_branch: null
+      }
     }
     {type: "branch" value: $current_branch}
   } else if ($identifier | str trim | parse -r '^\d+$' | is-not-empty) {
@@ -116,12 +127,34 @@ export def "ci github pr info" [
       gh pr list --head $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
     } catch {|err|
       $"Failed to get PR info: ($err.msg)" | ci log error
-      return {status: "error" error: $err.msg}
+      return {
+        status: "error"
+        error: $err.msg
+        number: null
+        title: null
+        state: null
+        merged: null
+        mergeable: null
+        url: null
+        head_branch: null
+        base_branch: null
+      }
     }
 
     if ($prs | is-empty) {
       $"No PR found for branch: ($lookup.value)" | ci log error
-      return {status: "not_found" error: $"No PR found for branch: ($lookup.value)"}
+      return {
+        status: "not_found"
+        error: $"No PR found for branch: ($lookup.value)"
+        number: null
+        title: null
+        state: null
+        merged: null
+        mergeable: null
+        url: null
+        head_branch: null
+        base_branch: null
+      }
     }
 
     let pr = $prs | first
@@ -143,7 +176,18 @@ export def "ci github pr info" [
       gh pr view $lookup.value --json number,title,state,merged,mergeable,url,headRefName,baseRefName | from json
     } catch {|err|
       $"Failed to get PR info: ($err.msg)" | ci log error
-      return {status: "error" error: $err.msg}
+      return {
+        status: "error"
+        error: $err.msg
+        number: null
+        title: null
+        state: null
+        merged: null
+        mergeable: null
+        url: null
+        head_branch: null
+        base_branch: null
+      }
     }
 
     {
@@ -168,7 +212,7 @@ export def "ci github pr create" [
   --target: string = "main" # Target branch
   --draft # Create as draft PR
 ]: [
-  nothing -> nothing
+  nothing -> record
 ] {
   let body = $description | default ""
 
@@ -179,26 +223,50 @@ export def "ci github pr create" [
       gh pr create --title $title --body $body --base $target --draft
     } catch {|err|
       $"Failed to create draft PR: ($err.msg)" | ci log error
-      return
+      return {
+        status: "error"
+        error: $err.msg
+        number: null
+        url: null
+        title: $title
+        draft: $draft
+      }
     }
   } else {
     try {
       gh pr create --title $title --body $body --base $target
     } catch {|err|
       $"Failed to create PR: ($err.msg)" | ci log error
-      return
+      return {
+        status: "error"
+        error: $err.msg
+        number: null
+        url: null
+        title: $title
+        draft: $draft
+      }
     }
   }
 
-  # Extract PR number from URL
-  let pr_number = ($result | parse "pull/{number}" | get number.0? | default "")
+  # Extract PR number and URL from result
+  let url = $result | str trim
+  let pr_number = ($url | parse "pull/{number}" | get number.0? | default "")
 
   if $draft {
     print $"✓ Created draft PR #($pr_number)"
   } else {
     print $"✓ Created PR #($pr_number)"
   }
-  print $"  ($result)"
+  print $"  ($url)"
+
+  {
+    status: "success"
+    error: null
+    number: ($pr_number | into int)
+    url: $url
+    title: $title
+    draft: $draft
+  }
 }
 
 # Update an existing pull request
