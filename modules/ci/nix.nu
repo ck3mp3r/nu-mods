@@ -342,11 +342,18 @@ export def "ci nix closure" []: [
   }
 
   $paths | each {|path|
+    $"Getting closure for path: ($path)" | ci log info
+
     try {
       # Use nix path-info --recursive to get all dependencies
-      nix path-info --recursive $path
-      | lines
-      | where {|line| ($line | str trim | is-not-empty) }
+      let closure = (
+        nix path-info --recursive $path
+        | lines
+        | where {|line| ($line | str trim | is-not-empty) }
+      )
+
+      $"Got ($closure | length) paths in closure for ($path)" | ci log info
+      $closure
     } catch {|err|
       $"Failed to get closure for ($path): ($err.msg)" | ci log error
       []
@@ -380,6 +387,22 @@ export def "ci nix cache" [
   }
 
   $paths | each {|path|
+    $"Processing cache for path: ($path)" | ci log info
+
+    # Verify the path exists locally first
+    let path_valid = (
+      try {
+        nix path-info $path | complete | get exit_code
+        0
+      } catch {
+        1
+      }
+    ) == 0
+
+    if (not $path_valid) {
+      $"WARNING: Path ($path) is not valid in local store!" | ci log warning
+    }
+
     # Check upstream cache if provided
     let upstream_check = if ($upstream | is-not-empty) {
       $"Checking ($path) in upstream cache ($upstream)" | ci log info
