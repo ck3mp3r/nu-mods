@@ -86,13 +86,23 @@
             dependencies = [self.packages.${system}.common];
           };
 
-          ci = mkNuModule {
-            pname = "ci";
-            src = ./modules/ci;
-            description = "CI/CD SCM flow utilities for Nushell";
-            dependencies = [self.packages.${system}.common];
-            runtimeInputs = [pkgs.cachix];
-          };
+          ci =
+            let
+              ciModule = mkNuModule {
+                pname = "ci";
+                src = ./modules/ci;
+                description = "CI/CD SCM flow utilities for Nushell";
+                dependencies = [self.packages.${system}.common];
+                runtimeInputs = [pkgs.cachix];
+              };
+            in
+              pkgs.symlinkJoin {
+                name = "ci";
+                paths = [
+                  ciModule
+                  pkgs.cachix
+                ];
+              };
 
           # Global package that bundles all modules
           default = pkgs.stdenvNoCC.mkDerivation {
