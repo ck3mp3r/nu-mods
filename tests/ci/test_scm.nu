@@ -19,12 +19,14 @@ export def "test ci scm branch feature with ticket prefix" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'add login' | ci scm branch --feature --prefix 'JIRA-1234'
+'add login' | ci scm branch --feature --prefix 'JIRA-1234' | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "JIRA-1234/feature/add-login") $"Expected branch name with ticket but got: ($output)"
-    assert ($output | str contains "Successfully created") $"Expected success message but got: ($output)"
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.branch == "JIRA-1234/feature/add-login") $"Expected branch name with ticket but got: ($result.branch)"
+    assert ($result.rebased == false) $"Expected rebased to be false"
   }
 }
 
@@ -64,12 +66,14 @@ export def "test ci scm branch hotfix with custom base" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/scm.nu *
-'patch vulnerability' | ci scm branch --hotfix --from production --prefix 'SEC-999'
+'patch vulnerability' | ci scm branch --hotfix --from production --prefix 'SEC-999' | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "SEC-999/hotfix/patch-vulnerability") $"Expected hotfix branch but got: ($output)"
-    assert ($output | str contains "from production") $"Expected base branch mentioned but got: ($output)"
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.branch == "SEC-999/hotfix/patch-vulnerability") $"Expected hotfix branch but got: ($result.branch)"
+    assert ($result.rebased == false) $"Expected rebased to be false"
   }
 }
 

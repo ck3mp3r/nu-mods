@@ -105,12 +105,14 @@ export def "test ci github pr check finds existing pr" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr check --target main
+ci github pr check --target main | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "PR #42") $"Expected PR number but got: ($output)"
-    assert ($output | str contains "Test PR") $"Expected PR title but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 PR but got: ($result | length)"
+    assert ($result.0.number == 42) $"Expected PR #42"
+    assert ($result.0.title == "Test PR") $"Expected title 'Test PR'"
   }
 }
 
@@ -124,11 +126,12 @@ export def "test ci github pr check no existing pr" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr check --target main
+ci github pr check --target main | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "No existing PR") $"Expected no PR message but got: ($output)"
+    assert (($result | length) == 0) $"Expected empty list but got: ($result)"
   }
 }
 
@@ -273,9 +276,7 @@ ci github pr create 'wip: feature' 'Draft description' --target develop --draft
 export def "test ci github pr merge squash default" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_merge_123_--squash_--auto": ({output: "Merged PR #123" exit_code: 0} | to json)
-    "MOCK_gh_pr_view_123_--json_headRefName": ({output: '{"headRefName":"feature/test"}' exit_code: 0} | to json)
-    "MOCK_gh_api_-X_DELETE__repos_{owner}_{repo}_git_refs_heads_feature_test": ({output: "" exit_code: 0} | to json)
+    "MOCK_gh_pr_merge_123_--squash": ({output: "Merged PR #123" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -287,7 +288,6 @@ ci github pr merge 123 | to json
 
     assert ($result.status == "success") $"Expected success but got: ($result.status)"
     assert ($result.pr_number == 123) $"Expected PR 123"
-    assert ($result.branch_deleted == true) $"Expected branch to be deleted"
   }
 }
 
@@ -295,9 +295,7 @@ ci github pr merge 123 | to json
 export def "test ci github pr merge with method" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_merge_456_--merge_--auto": ({output: "Merged PR #456" exit_code: 0} | to json)
-    "MOCK_gh_pr_view_456_--json_headRefName": ({output: '{"headRefName":"fix/bug"}' exit_code: 0} | to json)
-    "MOCK_gh_api_-X_DELETE__repos_{owner}_{repo}_git_refs_heads_fix_bug": ({output: "" exit_code: 0} | to json)
+    "MOCK_gh_pr_merge_456_--merge": ({output: "Merged PR #456" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -308,12 +306,11 @@ ci github pr merge 456 --method merge | to json
     let result = ($output | from json)
 
     assert ($result.status == "success") $"Expected success"
-    assert ($result.branch_deleted == true) $"Expected branch deleted"
   }
 }
 
-# Test 8: Merge PR without deleting branch
-export def "test ci github pr merge no delete" [] {
+# Test 8: Merge PR with auto-merge enabled
+export def "test ci github pr merge auto" [] {
   with-env {
     NU_TEST_MODE: "true"
     "MOCK_gh_pr_merge_789_--squash_--auto": ({output: "Merged PR #789" exit_code: 0} | to json)
@@ -321,13 +318,12 @@ export def "test ci github pr merge no delete" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr merge 789 --no-delete-branch | to json
+ci github pr merge 789 --auto | to json
 "
     let output = (nu -c $test_script)
     let result = ($output | from json)
 
     assert ($result.status == "success") $"Expected success"
-    assert ($result.branch_deleted == false) $"Expected branch NOT deleted"
   }
 }
 
@@ -335,7 +331,7 @@ ci github pr merge 789 --no-delete-branch | to json
 export def "test ci github pr merge failure" [] {
   with-env {
     NU_TEST_MODE: "true"
-    "MOCK_gh_pr_merge_999_--squash_--auto": ({output: "Error: PR has conflicts" exit_code: 1} | to json)
+    "MOCK_gh_pr_merge_999_--squash": ({output: "Error: PR has conflicts" exit_code: 1} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -359,12 +355,16 @@ export def "test ci github pr list with filter" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github pr list --state open
+ci github pr list --state open | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "First PR") $"Expected first PR but got: ($output)"
-    assert ($output | str contains "Second PR") $"Expected second PR but got: ($output)"
+    assert (($result | length) == 2) $"Expected 2 PRs but got: ($result | length)"
+    assert ($result.0.number == 1) $"Expected PR #1"
+    assert ($result.0.title == "First PR") $"Expected 'First PR'"
+    assert ($result.1.number == 2) $"Expected PR #2"
+    assert ($result.1.title == "Second PR") $"Expected 'Second PR'"
   }
 }
 
@@ -381,12 +381,17 @@ export def "test ci github workflow list" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github workflow list
+ci github workflow list | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "123") $"Expected run ID but got: ($output)"
-    assert ($output | str contains "CI") $"Expected workflow name but got: ($output)"
+    assert (($result | length) == 2) $"Expected 2 runs but got: ($result | length)"
+    assert ($result.0.databaseId == 123) $"Expected run ID 123"
+    assert ($result.0.name == "CI") $"Expected workflow name 'CI'"
+    assert ($result.0.conclusion == "success") $"Expected conclusion 'success'"
+    assert ($result.1.databaseId == 124) $"Expected run ID 124"
+    assert ($result.1.status == "in_progress") $"Expected status 'in_progress'"
   }
 }
 
@@ -399,12 +404,15 @@ export def "test ci github workflow list filter by status" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github workflow list --status failure
+ci github workflow list --status failure | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "125") $"Expected filtered run but got: ($output)"
-    assert (($output | str contains "failure") or ($output | str contains "Build")) $"Expected failure status but got: ($output)"
+    assert (($result | length) == 1) $"Expected 1 run but got: ($result | length)"
+    assert ($result.0.databaseId == 125) $"Expected run ID 125"
+    assert ($result.0.conclusion == "failure") $"Expected conclusion 'failure'"
+    assert ($result.0.name == "Build") $"Expected workflow name 'Build'"
   }
 }
 
@@ -417,12 +425,18 @@ export def "test ci github workflow view" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github workflow view 123
+ci github workflow view 123 | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert ($output | str contains "123") $"Expected run ID but got: ($output)"
-    assert ($output | str contains "success") $"Expected success status but got: ($output)"
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.run_id == 123) $"Expected run ID 123"
+    assert ($result.name == "CI") $"Expected workflow name 'CI'"
+    assert ($result.branch == "main") $"Expected branch 'main'"
+    assert ($result.conclusion == "success") $"Expected conclusion 'success'"
+    assert (($result.jobs | length) == 1) $"Expected 1 job"
+    assert ($result.jobs.0.name == "build") $"Expected job name 'build'"
   }
 }
 
@@ -452,11 +466,13 @@ export def "test ci github workflow cancel" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github workflow cancel 124
+ci github workflow cancel 124 | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert (($output | str contains "cancel") or ($output | str contains "124")) $"Expected cancel confirmation but got: ($output)"
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.run_id == 124) $"Expected run_id 124"
   }
 }
 
@@ -469,10 +485,12 @@ export def "test ci github workflow rerun" [] {
     let test_script = "
 use tests/mocks.nu *
 use modules/ci/github.nu *
-ci github workflow rerun 125
+ci github workflow rerun 125 | to json
 "
-    let output = (nu -c $test_script | str join "\n")
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
 
-    assert (($output | str contains "rerun") or ($output | str contains "125")) $"Expected rerun confirmation but got: ($output)"
+    assert ($result.status == "success") $"Expected success status"
+    assert ($result.run_id == 125) $"Expected run_id 125"
   }
 }
