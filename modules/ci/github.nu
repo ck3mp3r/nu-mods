@@ -250,7 +250,15 @@ export def "ci github pr create" [
 
   # Extract PR number and URL from result
   let url = $result | str trim
-  let pr_number = ($url | parse "pull/{number}" | get number.0? | default "")
+
+  # Parse PR number from URL (e.g., https://github.com/owner/repo/pull/82)
+  # Handle cases where URL might have extra text/newlines
+  let parsed = ($url | parse --regex '.*github\.com/[^/]+/[^/]+/pull/(?<number>\d+)')
+  let pr_number = if ($parsed | is-empty) {
+    null
+  } else {
+    $parsed | get number.0
+  }
 
   if $draft {
     print $"✓ Created draft PR #($pr_number)"
@@ -262,7 +270,7 @@ export def "ci github pr create" [
   {
     status: "success"
     error: null
-    number: ($pr_number | into int)
+    number: (if $pr_number != null { $pr_number | into int } else { null })
     url: $url
     title: $title
     draft: $draft
