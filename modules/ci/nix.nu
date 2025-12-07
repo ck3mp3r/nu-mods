@@ -250,7 +250,7 @@ export def "ci nix build" [
 
             try {
               let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-              mut cmd_args = [$target "--print-out-paths" "--no-link" "--no-update-lock-file"]
+              mut cmd_args = [$target "--print-out-paths" "--no-update-lock-file"]
 
               if $impure {
                 $cmd_args = ($cmd_args | append "--impure")
@@ -294,7 +294,7 @@ export def "ci nix build" [
 
         try {
           let target = if $flake == "." { $".#($pkg)" } else { $"($flake)#($pkg)" }
-          mut cmd_args = [$target "--print-out-paths" "--no-link" "--no-update-lock-file"]
+          mut cmd_args = [$target "--print-out-paths" "--no-update-lock-file"]
 
           if $impure {
             $cmd_args = ($cmd_args | append "--impure")
@@ -433,9 +433,25 @@ export def "ci nix cache" [
         $"Pushing ($path) to ($cache)" | ci log info
 
         try {
-          do $push_fn $path
-          $"Successfully pushed ($path) to ($cache)" | ci log info
-          {cache: $cache status: "success" error: null}
+          # In test mode, mocks don't support 'complete', so just run directly
+          if ("NU_TEST_MODE" in $env) {
+            do $push_fn $path
+            $"Successfully pushed ($path) to ($cache)" | ci log info
+            {cache: $cache status: "success" error: null}
+          } else {
+            # In production, use complete to capture full output
+            let result = (do $push_fn $path | complete)
+
+            if $result.exit_code == 0 {
+              $"Successfully pushed ($path) to ($cache)" | ci log info
+              {cache: $cache status: "success" error: null}
+            } else {
+              let error_output = ([$result.stdout $result.stderr] | where {|x| ($x | is-not-empty) } | str join "\n")
+              $"Failed to push ($path):" | ci log error
+              $error_output | lines | each {|line| $line | ci log error }
+              {cache: $cache status: "failed" error: $error_output}
+            }
+          }
         } catch {|err|
           $"Failed to push ($path): ($err.msg)" | ci log error
           {cache: $cache status: "failed" error: $err.msg}
