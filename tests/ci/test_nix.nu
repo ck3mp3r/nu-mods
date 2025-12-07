@@ -146,6 +146,7 @@ use modules/ci/nix.nu *
 export def "test ci nix build and push pipeline" [] {
   with-env {
     NU_TEST_MODE: "true"
+    "MOCK_nix_eval_--impure_--expr_builtins.currentSystem": ({output: "\"x86_64-linux\"" exit_code: 0} | to json)
     "MOCK_nix_build_.#pkg1_--print-out-paths_--no-update-lock-file": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
     "MOCK_nix_path-info__nix_store_abc-pkg1": ({output: "/nix/store/abc-pkg1" exit_code: 0} | to json)
     "MOCK_cachix_push_cachix__nix_store_abc-pkg1": ({output: "" exit_code: 0} | to json)
@@ -318,6 +319,7 @@ ci nix check --args '--verbose --option cores 4' | to json
 export def "test ci nix build with impure" [] {
   with-env {
     NU_TEST_MODE: "true"
+    "MOCK_nix_eval_--impure_--expr_builtins.currentSystem": ({output: "\"x86_64-linux\"" exit_code: 0} | to json)
     "MOCK_nix_build_.#mypackage_--print-out-paths_--no-update-lock-file_--impure": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
   } {
     let test_script = "
@@ -337,6 +339,7 @@ ci nix build mypackage --impure | to json
 export def "test ci nix build with args" [] {
   with-env {
     NU_TEST_MODE: "true"
+    "MOCK_nix_eval_--impure_--expr_builtins.currentSystem": ({output: "\"x86_64-linux\"" exit_code: 0} | to json)
     "MOCK_nix_build_.#mypackage_--print-out-paths_--no-update-lock-file_--option_cores_8": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
   } {
     let test_script = "
