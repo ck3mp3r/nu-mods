@@ -378,8 +378,6 @@ export def "ci nix cache" [
   }
 
   # Determine cache type and push command once before processing paths
-  # In test mode, mocks return complete-like structure directly
-  # In production, we use complete to get the structure
   let push_fn = if ($cache =~ '^https?://.*\.cachix\.org') {
     let cache_name = ($cache | parse 'https://{name}.cachix.org' | get name.0)
     if ("NU_TEST_MODE" in $env) {
@@ -448,7 +446,7 @@ export def "ci nix cache" [
       } else {
         $"Pushing ($path) to ($cache)" | ci log info
 
-        # Call push function - mocks return complete-like structure, real commands need wrapping
+        # Call push function and capture output
         let result = (do $push_fn $path)
 
         if $result.exit_code == 0 {
