@@ -200,7 +200,7 @@ use modules/ci/nix.nu *
   }
 }
 
-# Test 18: Check upstream and push to target cache
+# Test 18: Check upstream and push to target cache (path not in upstream)
 export def "test ci nix cache check and push" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -223,11 +223,53 @@ use modules/ci/nix.nu *
   }
 }
 
+# Test 19: Check upstream and skip push when already cached
+export def "test ci nix cache skip when upstream cached" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_xyz-pkg": ({output: "/nix/store/xyz-pkg" exit_code: 0} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['/nix/store/xyz-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.cached == true) $"Expected path in upstream"
+    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
+    assert ($result.0.cache == "cachix") $"Expected cache target set"
+    assert ($result.0.status == "skipped") $"Expected skipped status for cached path"
+  }
+}
+
+# Test 20: Dry-run status should be "dry-run" not "success"
+export def "test ci nix cache dry-run status" [] {
+  with-env {
+    NU_TEST_MODE: "true"
+    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "" exit_code: 1} | to json)
+  } {
+    let test_script = "
+use tests/mocks.nu *
+use modules/ci/nix.nu *
+['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' --dry-run | to json
+"
+    let output = (nu -c $test_script)
+    let result = ($output | from json)
+
+    assert (($result | length) == 1) $"Expected 1 result"
+    assert ($result.0.status == "dry-run") $"Expected dry-run status, not success"
+    assert ($result.0.cache == null) $"Expected no cache in dry-run"
+  }
+}
+
 # ============================================================================
 # IMPURE AND ARGS FLAGS TESTS
 # ============================================================================
 
-# Test 16: Check with --impure flag
+# Test 21: Check with --impure flag
 export def "test ci nix check with impure" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -245,7 +287,7 @@ ci nix check --impure | to json
   }
 }
 
-# Test 17: Check with --args
+# Test 22: Check with --args
 export def "test ci nix check with args" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -263,7 +305,7 @@ ci nix check --args '--verbose --option cores 4' | to json
   }
 }
 
-# Test 18: Build with --impure flag
+# Test 23: Build with --impure flag
 export def "test ci nix build with impure" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -282,7 +324,7 @@ ci nix build mypackage --impure | to json
   }
 }
 
-# Test 19: Build with --args
+# Test 24: Build with --args
 export def "test ci nix build with args" [] {
   with-env {
     NU_TEST_MODE: "true"
@@ -304,7 +346,7 @@ ci nix build mypackage --args '--option cores 8' | to json
 # FLAKES TESTS
 # ============================================================================
 
-# Test 20: Filter flakes - find only flake directories
+# Test 25: Filter flakes - find only flake directories
 export def "test ci nix flakes filters correctly" [] {
   # Create temp directories
   let temp_dir = (mktemp -d)
@@ -337,7 +379,7 @@ use modules/ci/nix.nu *
   rm -rf $temp_dir
 }
 
-# Test 21: Filter flakes - empty list
+# Test 26: Filter flakes - empty list
 export def "test ci nix flakes empty input" [] {
   let test_script = "
 use modules/ci/nix.nu *
@@ -349,7 +391,7 @@ use modules/ci/nix.nu *
   assert (($result | length) == 0) $"Expected 0 flakes but got: ($result | length)"
 }
 
-# Test 22: Filter flakes - all non-flakes
+# Test 27: Filter flakes - all non-flakes
 export def "test ci nix flakes all non-flakes" [] {
   let temp_dir = (mktemp -d)
   let dir1 = ($temp_dir | path join "dir1")
@@ -372,7 +414,7 @@ use modules/ci/nix.nu *
   rm -rf $temp_dir
 }
 
-# Test 23: Filter flakes - file paths are filtered out
+# Test 28: Filter flakes - file paths are filtered out
 export def "test ci nix flakes filters out file paths" [] {
   let temp_dir = (mktemp -d)
   let flake1 = ($temp_dir | path join "flake1")
@@ -398,7 +440,7 @@ use modules/ci/nix.nu *
   rm -rf $temp_dir
 }
 
-# Test 24: Filter flakes - mixed files, dirs, flakes, non-flakes
+# Test 29: Filter flakes - mixed files, dirs, flakes, non-flakes
 export def "test ci nix flakes mixed everything" [] {
   let temp_dir = (mktemp -d)
   let flake_dir = ($temp_dir | path join "flake_dir")
