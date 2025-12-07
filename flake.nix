@@ -36,10 +36,13 @@
             src,
             description,
             dependencies ? [],
+            runtimeInputs ? [],
           }:
             pkgs.stdenvNoCC.mkDerivation {
               inherit pname src;
               version = "0.1.0";
+
+              propagatedBuildInputs = runtimeInputs;
 
               dontBuild = true;
               dontConfigure = true;
@@ -88,6 +91,7 @@
             src = ./modules/ci;
             description = "CI/CD SCM flow utilities for Nushell";
             dependencies = [self.packages.${system}.common];
+            runtimeInputs = [pkgs.cachix];
           };
 
           # Global package that bundles all modules
