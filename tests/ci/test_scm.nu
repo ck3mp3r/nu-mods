@@ -11,9 +11,10 @@ export def "test ci scm branch feature with ticket prefix" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Already on 'main'" exit_code: 0} | to json)
+    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_JIRA-1234_feature_add-login": ({output: "Switched to a new branch 'JIRA-1234/feature/add-login'" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_JIRA-1234_feature_add-login": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_JIRA-1234_feature_add-login": ({output: "Switched to a new branch 'JIRA-1234/feature/add-login'" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -33,9 +34,10 @@ export def "test ci scm branch release with ticket" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "develop" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Switched to branch 'main'" exit_code: 0} | to json)
+    "MOCK_git_switch_main": ({output: "Switched to branch 'main'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_PROJ-500_release_v2.1.0": ({output: "Switched to a new branch 'PROJ-500/release/v2.1.0'" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_PROJ-500_release_v2.1.0": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_PROJ-500_release_v2.1.0": ({output: "Switched to a new branch 'PROJ-500/release/v2.1.0'" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -54,9 +56,10 @@ export def "test ci scm branch hotfix with custom base" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "develop" exit_code: 0} | to json)
-    "MOCK_git_checkout_production": ({output: "Switched to branch 'production'" exit_code: 0} | to json)
+    "MOCK_git_switch_production": ({output: "Switched to branch 'production'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_SEC-999_hotfix_patch-vulnerability": ({output: "Switched to a new branch 'SEC-999/hotfix/patch-vulnerability'" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_SEC-999_hotfix_patch-vulnerability": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_SEC-999_hotfix_patch-vulnerability": ({output: "Switched to a new branch 'SEC-999/hotfix/patch-vulnerability'" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -76,9 +79,10 @@ export def "test ci scm branch fix without ticket" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Already on 'main'" exit_code: 0} | to json)
+    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_fix_login-bug": ({output: "Switched to a new branch 'fix/login-bug'" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_fix_login-bug": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_fix_login-bug": ({output: "Switched to a new branch 'fix/login-bug'" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -97,9 +101,10 @@ export def "test ci scm branch sanitizes description" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Already on 'main'" exit_code: 0} | to json)
+    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_MAINT-100_chore_update-dependencies-and-cleanup": ({output: "Switched to a new branch" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_MAINT-100_chore_update-dependencies-and-cleanup": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_MAINT-100_chore_update-dependencies-and-cleanup": ({output: "Switched to a new branch" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *
@@ -110,28 +115,6 @@ use modules/ci/scm.nu *
 
     # Should lowercase, replace spaces, remove special chars
     assert ($output | str contains "update-dependencies-and-cleanup") $"Expected sanitized description but got: ($output)"
-  }
-}
-
-# Test 6: No-checkout flag
-export def "test ci scm branch no checkout flag" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Already on 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_branch_TEST-789_feature_new-thing": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'new thing' | ci scm branch --feature --no-checkout --prefix 'TEST-789'
-"
-    let output = (nu -c $test_script | str join "\n")
-
-    assert ($output | str contains "Created branch") $"Expected creation message but got: ($output)"
-    assert ($output | str contains "TEST-789/feature/new-thing") $"Expected branch name but got: ($output)"
   }
 }
 
@@ -161,9 +144,10 @@ export def "test ci scm branch defaults to feature" [] {
     NU_TEST_MODE: "true"
     "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
     "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_checkout_main": ({output: "Already on 'main'" exit_code: 0} | to json)
+    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
     "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_checkout_-b_feature_default-test": ({output: "Switched to a new branch 'feature/default-test'" exit_code: 0} | to json)
+    "MOCK_git_rev-parse_--verify_feature_default-test": ({output: "" exit_code: 128} | to json)
+    "MOCK_git_switch_-c_feature_default-test": ({output: "Switched to a new branch 'feature/default-test'" exit_code: 0} | to json)
   } {
     let test_script = "
 use tests/mocks.nu *

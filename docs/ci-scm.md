@@ -120,14 +120,15 @@ Create standardized branches with flow-based naming.
 - `--release` - Release branch
 - `--chore` - Chore/maintenance branch
 - `--from <branch>` - Base branch (default: main)
-- `--no-checkout` - Create without checking out
+- `--reuse` - If branch exists, checkout and rebase instead of failing
 
 **Returns:**
 ```nu
 {
   status: "success" | "error",
   error: string?,          # Error message if status is "error"
-  branch: string?          # Branch name that was created
+  branch: string?,         # Branch name that was created/checked out
+  rebased: bool            # Whether a rebase was performed (if true, force push needed)
 }
 ```
 
@@ -159,9 +160,10 @@ Create standardized branches with flow-based naming.
 "v2.1.0" | ci scm branch --release --from develop
 # Creates: release/v2.1.0
 
-# Chore without checkout
-"update dependencies" | ci scm branch --chore --no-checkout
-# Creates: chore/update-dependencies (no checkout)
+# Reuse existing branch (checkout and rebase)
+"add feature" | ci scm branch --reuse
+# If feature/add-feature exists: checks out and rebases
+# If it doesn't exist: creates it normally
 
 # Use in workflows
 let result = ("add feature" | ci scm branch)

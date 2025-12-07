@@ -72,7 +72,7 @@ export def "ci scm branch" [
   --chore # Create a chore branch
   --feature # Create a feature branch (default)
   --from: string = "main" # Base branch to branch from
-  --no-checkout # Create but don't checkout
+  --reuse # If branch exists, checkout and rebase instead of failing
 ]: string -> record {
 
   # Get description from stdin
@@ -125,10 +125,10 @@ export def "ci scm branch" [
   if $current_branch != $from {
     $"Switching to base branch: ($from)" | ci log info
     try {
-      git checkout $from
+      git switch $from
     } catch {|err|
       $"Failed to checkout base branch ($from): ($err.msg)" | ci log error
-      return {status: "error" error: $"Failed to checkout base branch: ($err.msg)" branch: null}
+      return {status: "error" error: $"Failed to checkout base branch: ($err.msg)" branch: null rebased: false}
     }
   }
 
@@ -140,26 +140,52 @@ export def "ci scm branch" [
     $"Failed to pull latest changes: ($err.msg)" | ci log warning
   }
 
-  # Create and optionally checkout branch
-  if $no_checkout {
-    $"Creating branch: ($branch_name) from ($from)" | ci log info
-    try {
-      git branch $branch_name
-      print $"✅ Created branch: ($branch_name) from ($from)"
-      {status: "success" error: null branch: $branch_name}
-    } catch {|err|
-      $"Failed to create branch: ($err.msg)" | ci log error
-      {status: "error" error: $"Failed to create branch: ($err.msg)" branch: null}
+  # Check if branch already exists (exit code 0 = exists, non-zero = doesn't exist)
+  # Note: In tests, mocks throw errors for non-zero exit codes, so we catch that
+  let branch_exists = try {
+    git rev-parse --verify $branch_name | complete | get exit_code
+  } catch {
+    128 # Branch doesn't exist (mock threw error)
+  }
+
+  if $branch_exists == 0 {
+    if $reuse {
+      $"Branch ($branch_name) already exists, checking out and rebasing" | ci log info
+      try {
+        git switch $branch_name
+
+        # Get the commit hash before rebase
+        let before_hash = (git rev-parse HEAD | str trim)
+
+        # Perform rebase
+        git pull --rebase origin $branch_name
+
+        # Get the commit hash after rebase
+        let after_hash = (git rev-parse HEAD | str trim)
+
+        # If hash changed, we rebased and need force push
+        let rebased = $before_hash != $after_hash
+
+        print $"✅ Checked out existing branch and rebased: ($branch_name)"
+        {status: "success" error: null branch: $branch_name rebased: $rebased}
+      } catch {|err|
+        $"Failed to checkout/rebase branch: ($err.msg)" | ci log error
+        {status: "error" error: $"Failed to checkout/rebase branch: ($err.msg)" branch: null rebased: false}
+      }
+    } else {
+      $"Branch ($branch_name) already exists" | ci log error
+      {status: "error" error: $"Branch ($branch_name) already exists. Use --reuse to checkout and rebase." branch: null rebased: false}
     }
   } else {
+    # Create and switch to branch
     $"Creating branch: ($branch_name) from ($from)" | ci log info
     try {
-      git checkout -b $branch_name
+      git switch -c $branch_name
       print $"✅ Successfully created and switched to branch: ($branch_name) from ($from)"
-      {status: "success" error: null branch: $branch_name}
+      {status: "success" error: null branch: $branch_name rebased: false}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error
-      {status: "error" error: $"Failed to create branch: ($err.msg)" branch: null}
+      {status: "error" error: $"Failed to create branch: ($err.msg)" branch: null rebased: false}
     }
   }
 }
