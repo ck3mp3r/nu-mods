@@ -380,22 +380,31 @@ export def "ci nix cache" [
   # Determine cache type and push command once before processing paths
   let push_fn = if ($cache =~ '^https?://.*\.cachix\.org') {
     let cache_name = ($cache | parse 'https://{name}.cachix.org' | get name.0)
-    if ("NU_TEST_MODE" in $env) {
-      {|path| cachix push $cache_name $path }
-    } else {
-      {|path| cachix push $cache_name $path | complete }
+    {|path|
+      try {
+        cachix push $cache_name $path
+        {exit_code: 0 stdout: "" stderr: ""}
+      } catch {|err|
+        {exit_code: 1 stdout: "" stderr: $err.msg}
+      }
     }
   } else if ($cache =~ '^[a-z][a-z0-9+.-]*://') {
-    if ("NU_TEST_MODE" in $env) {
-      {|path| nix copy --to $cache $path }
-    } else {
-      {|path| nix copy --to $cache $path | complete }
+    {|path|
+      try {
+        nix copy --to $cache $path
+        {exit_code: 0 stdout: "" stderr: ""}
+      } catch {|err|
+        {exit_code: 1 stdout: "" stderr: $err.msg}
+      }
     }
   } else {
-    if ("NU_TEST_MODE" in $env) {
-      {|path| cachix push $cache $path }
-    } else {
-      {|path| cachix push $cache $path | complete }
+    {|path|
+      try {
+        cachix push $cache $path
+        {exit_code: 0 stdout: "" stderr: ""}
+      } catch {|err|
+        {exit_code: 1 stdout: "" stderr: $err.msg}
+      }
     }
   }
 
