@@ -1,4 +1,4 @@
-# Matcher system for nu-mock
+# Matcher system for nu-mimic
 # Provides tiered matching: exact, regex, type-check, custom, any
 
 # Exact matcher - args must match exactly

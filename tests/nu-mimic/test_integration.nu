@@ -1,4 +1,4 @@
-# Integration tests: nu-mock registry and matcher integration
+# Integration tests: nu-mimic registry and matcher integration
 # Tests that the full system works together
 
 use std assert
