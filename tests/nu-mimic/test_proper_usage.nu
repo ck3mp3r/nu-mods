@@ -8,43 +8,40 @@ use ../../modules/nu-mimic *
 
 # Test: Complete workflow - setup, run, verify
 export def --env "test complete mock workflow" [] {
-  mimic reset
+  with-mimic {
+    # 1. Setup all expectations upfront
+    mimic register git {
+      args: ['status']
+      returns: 'clean'
+      times: 2
+    }
 
-  # 1. Setup all expectations upfront
-  mimic register git {
-    args: ['status']
-    returns: 'clean'
-    times: 2
+    mimic register git {
+      args: ['push']
+      returns: 'success'
+      times: 1
+    }
+
+    # 2. Create wrapper for git using --wrapped
+    def --env --wrapped git [...args] { mimic call 'git' $args }
+
+    # 3. Run code under test
+    def --env my-git-workflow [] {
+      # Just call git naturally!
+      let status1 = (git status)
+      let status2 = (git status)
+      let push_result = (git push)
+
+      {status1: $status1 status2: $status2 push: $push_result}
+    }
+
+    let results = (my-git-workflow)
+
+    # Verify the mocked values were returned
+    assert equal 'clean' $results.status1
+    assert equal 'clean' $results.status2
+    assert equal 'success' $results.push
   }
-
-  mimic register git {
-    args: ['push']
-    returns: 'success'
-    times: 1
-  }
-
-  # 2. Create wrapper for git using --wrapped
-  def --env --wrapped git [...args] { mimic call 'git' $args }
-
-  # 3. Run code under test
-  def --env my-git-workflow [] {
-    # Just call git naturally!
-    let status1 = (git status)
-    let status2 = (git status)
-    let push_result = (git push)
-
-    {status1: $status1 status2: $status2 push: $push_result}
-  }
-
-  let results = (my-git-workflow)
-
-  # Verify the mocked values were returned
-  assert equal 'clean' $results.status1
-  assert equal 'clean' $results.status2
-  assert equal 'success' $results.push
-
-  # 4. Verify all expectations were met
-  mimic verify
 }
 
 # Test: Verify catches missing calls
