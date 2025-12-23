@@ -2,166 +2,288 @@
 # Focus: Test branch creation with different flow types and ticket IDs
 
 use std/assert
-use ../mocks.nu *
-use ../../modules/ci/scm.nu *
+use ../../modules/nu-mock *
+use test_wrappers.nu * # Import wrapped commands FIRST
+use ../../modules/ci/scm.nu * # Then import module under test
 
 # Test 1: Feature branch with ticket ID via --prefix flag
-export def "test ci scm branch feature with ticket prefix" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_JIRA-1234_feature_add-login": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_JIRA-1234_feature_add-login": ({output: "Switched to a new branch 'JIRA-1234/feature/add-login'" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'add login' | ci scm branch --feature --prefix 'JIRA-1234' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci scm branch feature with ticket prefix" [] {
+  mock reset
 
-    assert ($result.status == "success") $"Expected success status"
-    assert ($result.branch == "JIRA-1234/feature/add-login") $"Expected branch name with ticket but got: ($result.branch)"
-    assert ($result.rebased == false) $"Expected rebased to be false"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "main"
+  }
+
+  mock register git {
+    args: ['switch' 'main']
+    returns: "Already on 'main'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'JIRA-1234/feature/add-login']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'JIRA-1234/feature/add-login']
+    returns: "Switched to a new branch 'JIRA-1234/feature/add-login'"
+  }
+
+  let result = ('add login' | ci scm branch --feature --prefix 'JIRA-1234')
+
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "JIRA-1234/feature/add-login") $"Expected branch name with ticket but got: ($result.branch)"
+  assert ($result.rebased == false) $"Expected rebased to be false"
+
+  mock verify
 }
 
 # Test 2: Release branch with ticket ID
-export def "test ci scm branch release with ticket" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "develop" exit_code: 0} | to json)
-    "MOCK_git_switch_main": ({output: "Switched to branch 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_PROJ-500_release_v2.1.0": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_PROJ-500_release_v2.1.0": ({output: "Switched to a new branch 'PROJ-500/release/v2.1.0'" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'v2.1.0' | ci scm branch --release --prefix 'PROJ-500'
-"
-    let output = (nu -c $test_script | str join "\n")
+export def --env "test ci scm branch release with ticket" [] {
+  mock reset
 
-    assert ($output | str contains "PROJ-500/release/v2.1.0") $"Expected release branch but got: ($output)"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "develop"
+  }
+
+  mock register git {
+    args: ['switch' 'main']
+    returns: "Switched to branch 'main'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'PROJ-500/release/v2.1.0']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'PROJ-500/release/v2.1.0']
+    returns: "Switched to a new branch 'PROJ-500/release/v2.1.0'"
+  }
+
+  let result = ('v2.1.0' | ci scm branch --release --prefix 'PROJ-500')
+
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "PROJ-500/release/v2.1.0") $"Expected release branch but got: ($result.branch)"
+
+  mock verify
 }
 
 # Test 3: Hotfix branch from custom base
-export def "test ci scm branch hotfix with custom base" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "develop" exit_code: 0} | to json)
-    "MOCK_git_switch_production": ({output: "Switched to branch 'production'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_SEC-999_hotfix_patch-vulnerability": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_SEC-999_hotfix_patch-vulnerability": ({output: "Switched to a new branch 'SEC-999/hotfix/patch-vulnerability'" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'patch vulnerability' | ci scm branch --hotfix --from production --prefix 'SEC-999' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci scm branch hotfix with custom base" [] {
+  mock reset
 
-    assert ($result.status == "success") $"Expected success status"
-    assert ($result.branch == "SEC-999/hotfix/patch-vulnerability") $"Expected hotfix branch but got: ($result.branch)"
-    assert ($result.rebased == false) $"Expected rebased to be false"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "develop"
+  }
+
+  mock register git {
+    args: ['switch' 'production']
+    returns: "Switched to branch 'production'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'SEC-999/hotfix/patch-vulnerability']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'SEC-999/hotfix/patch-vulnerability']
+    returns: "Switched to a new branch 'SEC-999/hotfix/patch-vulnerability'"
+  }
+
+  let result = ('patch vulnerability' | ci scm branch --hotfix --from production --prefix 'SEC-999')
+
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "SEC-999/hotfix/patch-vulnerability") $"Expected hotfix branch but got: ($result.branch)"
+  assert ($result.rebased == false) $"Expected rebased to be false"
+
+  mock verify
 }
 
 # Test 4: Fix branch without ticket ID
-export def "test ci scm branch fix without ticket" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_fix_login-bug": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_fix_login-bug": ({output: "Switched to a new branch 'fix/login-bug'" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'login bug' | ci scm branch --fix
-"
-    let output = (nu -c $test_script | str join "\n")
+export def --env "test ci scm branch fix without ticket" [] {
+  mock reset
 
-    assert ($output | str contains "fix/login-bug") $"Expected fix branch without ticket but got: ($output)"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "main"
+  }
+
+  mock register git {
+    args: ['switch' 'main']
+    returns: "Already on 'main'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'fix/login-bug']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'fix/login-bug']
+    returns: "Switched to a new branch 'fix/login-bug'"
+  }
+
+  let result = ('login bug' | ci scm branch --fix)
+
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "fix/login-bug") $"Expected fix branch without ticket but got: ($result.branch)"
+
+  mock verify
 }
 
 # Test 5: Chore branch with description sanitization
-export def "test ci scm branch sanitizes description" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_MAINT-100_chore_update-dependencies-and-cleanup": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_MAINT-100_chore_update-dependencies-and-cleanup": ({output: "Switched to a new branch" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'Update Dependencies AND Cleanup!!!' | ci scm branch --chore --prefix 'MAINT-100'
-"
-    let output = (nu -c $test_script | str join "\n")
+export def --env "test ci scm branch sanitizes description" [] {
+  mock reset
 
-    # Should lowercase, replace spaces, remove special chars
-    assert ($output | str contains "update-dependencies-and-cleanup") $"Expected sanitized description but got: ($output)"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "main"
+  }
+
+  mock register git {
+    args: ['switch' 'main']
+    returns: "Already on 'main'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'MAINT-100/chore/update-dependencies-and-cleanup']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'MAINT-100/chore/update-dependencies-and-cleanup']
+    returns: "Switched to a new branch"
+  }
+
+  let result = ('Update Dependencies AND Cleanup!!!' | ci scm branch --chore --prefix 'MAINT-100')
+
+  # Should lowercase, replace spaces, remove special chars
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "MAINT-100/chore/update-dependencies-and-cleanup") $"Expected sanitized branch but got: ($result.branch)"
+
+  mock verify
 }
 
 # Test 7: Error handling - not a git repo
-export def "test ci scm branch error not git repo" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "fatal: not a git repository" exit_code: 128} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'test' | ci scm branch --feature | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci scm branch error not git repo" [] {
+  mock reset
 
-    assert ($result.status == "error") $"Expected error status"
-    assert ($result.branch == null) $"Expected null branch"
-    assert ($result.error != null) $"Expected error message"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: "fatal: not a git repository"
+    exit_code: 128
   }
+
+  let result = ('test' | ci scm branch --feature)
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.branch == null) $"Expected null branch"
+  assert ($result.error != null) $"Expected error message"
+
+  mock verify
 }
 
 # Test 8: Default to feature when no flow flag provided
-export def "test ci scm branch defaults to feature" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--abbrev-ref_HEAD": ({output: "main" exit_code: 0} | to json)
-    "MOCK_git_switch_main": ({output: "Already on 'main'" exit_code: 0} | to json)
-    "MOCK_git_pull": ({output: "Already up to date." exit_code: 0} | to json)
-    "MOCK_git_rev-parse_--verify_feature_default-test": ({output: "" exit_code: 128} | to json)
-    "MOCK_git_switch_-c_feature_default-test": ({output: "Switched to a new branch 'feature/default-test'" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-'default test' | ci scm branch
-"
-    let output = (nu -c $test_script | str join "\n")
+export def --env "test ci scm branch defaults to feature" [] {
+  mock reset
 
-    assert ($output | str contains "feature/default-test") $"Expected feature branch by default but got: ($output)"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['rev-parse' '--abbrev-ref' 'HEAD']
+    returns: "main"
+  }
+
+  mock register git {
+    args: ['switch' 'main']
+    returns: "Already on 'main'"
+  }
+
+  mock register git {
+    args: ['pull']
+    returns: "Already up to date."
+  }
+
+  mock register git {
+    args: ['rev-parse' '--verify' 'feature/default-test']
+    returns: ""
+    exit_code: 128
+  }
+
+  mock register git {
+    args: ['switch' '-c' 'feature/default-test']
+    returns: "Switched to a new branch 'feature/default-test'"
+  }
+
+  let result = ('default test' | ci scm branch)
+
+  assert ($result.status == "success") $"Expected success status"
+  assert ($result.branch == "feature/default-test") $"Expected feature branch by default but got: ($result.branch)"
+
+  mock verify
 }
 
 # ============================================================================
@@ -169,45 +291,57 @@ use modules/ci/scm.nu *
 # ============================================================================
 
 # Test 9: Commit specific files with message
-export def "test ci scm commit with files and message" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_add_file1.txt_file2.txt": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_commit_-m_feat:_add_new_feature": ({output: "[main abc123] feat: add new feature" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-['file1.txt' 'file2.txt'] | ci scm commit --message 'feat: add new feature' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci scm commit with files and message" [] {
+  mock reset
 
-    assert ($result.status == "success") $"Expected success but got: ($result.status)"
-    assert ($result.message == "feat: add new feature") $"Expected message but got: ($result.message)"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['add' 'file1.txt' 'file2.txt']
+    returns: ""
+  }
+
+  mock register git {
+    args: ['commit' '-m' 'feat: add new feature']
+    returns: "[main abc123] feat: add new feature"
+  }
+
+  let result = (['file1.txt' 'file2.txt'] | ci scm commit --message 'feat: add new feature')
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.message == "feat: add new feature") $"Expected message but got: ($result.message)"
+
+  mock verify
 }
 
 # Test 10: Commit with custom message  
-export def "test ci scm commit with custom message" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_git_status_--porcelain": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_add_-A": ({output: "" exit_code: 0} | to json)
-    "MOCK_git_commit_-m_test_message": ({output: "[main def456] test message" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/scm.nu *
-ci scm commit -m 'test message' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci scm commit with custom message" [] {
+  mock reset
 
-    assert ($result.status == "success") $"Expected success but got: ($result.status)"
-    assert ($result.message == "test message") $"Expected test message"
+  mock register git {
+    args: ['status' '--porcelain']
+    returns: ""
   }
+
+  mock register git {
+    args: ['add' '-A']
+    returns: ""
+  }
+
+  mock register git {
+    args: ['commit' '-m' 'test message']
+    returns: "[main def456] test message"
+  }
+
+  let result = (ci scm commit -m 'test message')
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.message == "test message") $"Expected test message"
+
+  mock verify
 }
 
 # Test 11: Commit single file via string input
