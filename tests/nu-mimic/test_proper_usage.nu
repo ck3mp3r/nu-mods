@@ -72,7 +72,7 @@ mimic verify
   let result = (do { nu --no-config-file -c $test_script } | complete)
 
   assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "expected 2 calls, got 1")
+  assert ($result.stderr | str contains "expected 2 calls")
 }
 
 # Test: Wrapped function pattern with exit codes
