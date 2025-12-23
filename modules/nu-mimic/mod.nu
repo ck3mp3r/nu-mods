@@ -3,18 +3,22 @@
 # Usage:
 #   use modules/nu-mimic *
 #
-#   # 1. Setup expectations
+#   # Recommended: Use with-mimic helper
+#   export def --env "test my feature" [] {
+#     with-mimic {
+#       mimic register git { args: ['status'], returns: 'clean' }
+#       
+#       let result = (some_function_that_calls_git)
+#       assert equal 'expected' $result
+#       # reset and verify happen automatically
+#     }
+#   }
+#
+#   # Or manual approach:
+#   mimic reset
 #   mimic register git { args: ['status'], returns: 'clean' }
-#   mimic register git { args: ['push'], returns: 'success' }
-#
-#   # 2. Create wrapper for the command you want to mimic
 #   def --env --wrapped git [...args] { mimic call 'git' $args }
-#
-#   # 3. Use the command naturally
 #   git status  # Returns 'clean'
-#   git push    # Returns 'success'
-#
-#   # 4. Verify all expectations met
 #   mimic verify
 
 # Initialize the registry (lazy initialization)
@@ -142,6 +146,11 @@ export def "mimic verify" [] {
     let cmd_calls = ($calls | get -o $command | default [])
 
     for exp in $cmd_expectations {
+      # Skip consumed expectations (times: 1 that were already used)
+      if ($exp | get -o consumed | default false) {
+        continue
+      }
+
       let times = ($exp | get -o times | default null)
 
       if $times != null {
@@ -207,5 +216,30 @@ export def --env "mimic reset" [] {
   $env.__NU_MIMIC_REGISTRY__ = {
     expectations: {}
     calls: {}
+  }
+}
+
+# Helper to run test with automatic reset and verify
+# Wraps a test closure to handle boilerplate setup/teardown
+export def --env "with-mimic" [
+  test_fn: closure # Test code to run
+] {
+  mimic reset
+
+  let test_error = (
+    try {
+      do --env $test_fn
+      null
+    } catch {|err|
+      $err
+    }
+  )
+
+  # Always verify, even if test errored
+  mimic verify
+
+  # Re-throw test error if there was one
+  if $test_error != null {
+    error make {msg: $test_error.msg}
   }
 }

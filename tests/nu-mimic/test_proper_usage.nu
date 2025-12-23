@@ -98,3 +98,64 @@ mimic call 'git' ['push']
   assert ($result.exit_code != 0)
   assert ($result.stderr | str contains "fatal: remote error")
 }
+
+# Test: with-mimic helper - successful test
+export def --env "test with-mimic helper success" [] {
+  with-mimic {
+    mimic register git {
+      args: ['status']
+      returns: 'clean'
+    }
+
+    let result = (mimic call 'git' ['status'])
+    assert equal 'clean' $result
+  }
+  # Verify should have been called automatically
+}
+
+# Test: with-mimic helper - handles test errors and still verifies
+export def "test with-mimic helper verifies on error" [] {
+  let test_script = "
+use modules/nu-mimic *
+
+with-mimic {
+  mimic register git {
+    args: ['status']
+    returns: 'output'
+    times: 2
+  }
+  
+  # Only make 1 call
+  mimic call 'git' ['status']
+  
+  # Don't call verify - with-mimic should do it
+}
+"
+
+  let result = (do { nu --no-config-file -c $test_script } | complete)
+
+  # Should fail because verify detects unmet expectations
+  assert ($result.exit_code != 0)
+  assert ($result.stderr | str contains "verification failed")
+}
+
+# Test: with-mimic helper - reset happens automatically
+export def --env "test with-mimic helper auto resets" [] {
+  # Set up some state
+  mimic register git {
+    args: ['old']
+    returns: 'old data'
+  }
+
+  # with-mimic should reset this
+  with-mimic {
+    # This should work without errors about 'old' expectation
+    mimic register git {
+      args: ['status']
+      returns: 'clean'
+    }
+
+    let result = (mimic call 'git' ['status'])
+    assert equal 'clean' $result
+  }
+}
