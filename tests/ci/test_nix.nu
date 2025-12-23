@@ -233,71 +233,83 @@ export def --env "test ci nix cache check upstream not cached" [] {
 }
 
 # Test 18: Check upstream and push to target cache (path not in upstream)
-export def "test ci nix cache check and push" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_path-info__nix_store_abc-pkg": ({output: "/nix/store/abc-pkg" exit_code: 0} | to json)
-    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "" exit_code: 1} | to json)
-    "MOCK_cachix_push_cachix__nix_store_abc-pkg": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix cache check and push" [] {
+  mock reset
 
-    assert (($result | length) == 1) $"Expected 1 result"
-    assert ($result.0.cached == false) $"Expected path not in upstream"
-    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
-    assert ($result.0.cache == "cachix") $"Expected push to cachix"
-    assert ($result.0.status == "success") $"Expected successful push"
+  mock register nix {
+    args: ['path-info' '/nix/store/abc-pkg']
+    returns: "/nix/store/abc-pkg"
   }
+
+  mock register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/abc-pkg']
+    returns: ""
+    exit_code: 1
+  }
+
+  mock register cachix {
+    args: ['push' 'cachix' '/nix/store/abc-pkg']
+    returns: ""
+  }
+
+  let result = (['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org')
+
+  assert (($result | length) == 1) $"Expected 1 result"
+  assert ($result.0.cached == false) $"Expected path not in upstream"
+  assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
+  assert ($result.0.cache == "cachix") $"Expected push to cachix"
+  assert ($result.0.status == "success") $"Expected successful push"
+
+  mock verify
 }
 
 # Test 19: Check upstream and skip push when already cached
-export def "test ci nix cache skip when upstream cached" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_path-info__nix_store_xyz-pkg": ({output: "/nix/store/xyz-pkg" exit_code: 0} | to json)
-    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_xyz-pkg": ({output: "/nix/store/xyz-pkg" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['/nix/store/xyz-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix cache skip when upstream cached" [] {
+  mock reset
 
-    assert (($result | length) == 1) $"Expected 1 result"
-    assert ($result.0.cached == true) $"Expected path in upstream"
-    assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
-    assert ($result.0.cache == "cachix") $"Expected cache target set"
-    assert ($result.0.status == "skipped") $"Expected skipped status for cached path"
+  mock register nix {
+    args: ['path-info' '/nix/store/xyz-pkg']
+    returns: "/nix/store/xyz-pkg"
   }
+
+  mock register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/xyz-pkg']
+    returns: "/nix/store/xyz-pkg"
+  }
+
+  let result = (['/nix/store/xyz-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org')
+
+  assert (($result | length) == 1) $"Expected 1 result"
+  assert ($result.0.cached == true) $"Expected path in upstream"
+  assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream checked"
+  assert ($result.0.cache == "cachix") $"Expected cache target set"
+  assert ($result.0.status == "skipped") $"Expected skipped status for cached path"
+
+  mock verify
 }
 
 # Test 20: Dry-run status should be "dry-run" not "success"
-export def "test ci nix cache dry-run status" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_path-info__nix_store_abc-pkg": ({output: "/nix/store/abc-pkg" exit_code: 0} | to json)
-    "MOCK_nix_path-info_--store_https:__cache.nixos.org__nix_store_abc-pkg": ({output: "" exit_code: 1} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' --dry-run | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix cache dry-run status" [] {
+  mock reset
 
-    assert (($result | length) == 1) $"Expected 1 result"
-    assert ($result.0.status == "dry-run") $"Expected dry-run status, not success"
-    assert ($result.0.cache == null) $"Expected no cache in dry-run"
+  mock register nix {
+    args: ['path-info' '/nix/store/abc-pkg']
+    returns: "/nix/store/abc-pkg"
   }
+
+  mock register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/abc-pkg']
+    returns: ""
+    exit_code: 1
+  }
+
+  let result = (['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org' --dry-run)
+
+  assert (($result | length) == 1) $"Expected 1 result"
+  assert ($result.0.status == "dry-run") $"Expected dry-run status, not success"
+  assert ($result.0.cache == null) $"Expected no cache in dry-run"
+
+  mock verify
 }
 
 # ============================================================================
@@ -305,78 +317,78 @@ use modules/ci/nix.nu *
 # ============================================================================
 
 # Test 21: Check with --impure flag
-export def "test ci nix check with impure" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--impure_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix check --impure | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix check with impure" [] {
+  mock reset
 
-    assert ($result.0.status == "success") $"Expected success with --impure"
+  mock register nix {
+    args: ['flake' 'check' '--impure' '--no-update-lock-file']
+    returns: ''
   }
+
+  let result = (ci nix check --impure)
+
+  assert ($result.0.status == "success") $"Expected success with --impure"
+
+  mock verify
 }
 
 # Test 22: Check with --args
-export def "test ci nix check with args" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_flake_check_--verbose_--option_cores_4_--no-update-lock-file": ({output: "" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix check --args '--verbose --option cores 4' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix check with args" [] {
+  mock reset
 
-    assert ($result.0.status == "success") $"Expected success with --args"
+  mock register nix {
+    args: ['flake' 'check' '--verbose' '--option' 'cores' '4' '--no-update-lock-file']
+    returns: ''
   }
+
+  let result = (ci nix check --args '--verbose --option cores 4')
+
+  assert ($result.0.status == "success") $"Expected success with --args"
+
+  mock verify
 }
 
 # Test 23: Build with --impure flag
-export def "test ci nix build with impure" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_eval_--impure_--expr_builtins.currentSystem": ({output: "\"x86_64-linux\"" exit_code: 0} | to json)
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-update-lock-file_--impure": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix build mypackage --impure | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix build with impure" [] {
+  mock reset
 
-    assert ($result.0.status == "success") $"Expected success with --impure"
-    assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
+  mock register nix {
+    args: ['eval' '--impure' '--expr' 'builtins.currentSystem']
+    returns: "\"x86_64-linux\""
   }
+
+  mock register nix {
+    args: ['build' '.#mypackage' '--print-out-paths' '--no-update-lock-file' '--impure']
+    returns: "/nix/store/xyz-mypackage"
+  }
+
+  let result = (ci nix build mypackage --impure)
+
+  assert ($result.0.status == "success") $"Expected success with --impure"
+  assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
+
+  mock verify
 }
 
 # Test 24: Build with --args
-export def "test ci nix build with args" [] {
-  with-env {
-    NU_TEST_MODE: "true"
-    "MOCK_nix_eval_--impure_--expr_builtins.currentSystem": ({output: "\"x86_64-linux\"" exit_code: 0} | to json)
-    "MOCK_nix_build_.#mypackage_--print-out-paths_--no-update-lock-file_--option_cores_8": ({output: "/nix/store/xyz-mypackage" exit_code: 0} | to json)
-  } {
-    let test_script = "
-use tests/mocks.nu *
-use modules/ci/nix.nu *
-ci nix build mypackage --args '--option cores 8' | to json
-"
-    let output = (nu -c $test_script)
-    let result = ($output | from json)
+export def --env "test ci nix build with args" [] {
+  mock reset
 
-    assert ($result.0.status == "success") $"Expected success with --args"
+  mock register nix {
+    args: ['eval' '--impure' '--expr' 'builtins.currentSystem']
+    returns: "\"x86_64-linux\""
   }
+
+  mock register nix {
+    args: ['build' '.#mypackage' '--print-out-paths' '--no-update-lock-file' '--option' 'cores' '8']
+    returns: "/nix/store/xyz-mypackage"
+  }
+
+  let result = (ci nix build mypackage --args '--option cores 8')
+
+  assert ($result.0.status == "success") $"Expected success with --args"
+
+  mock verify
 }
 
 # ============================================================================
