@@ -48,27 +48,27 @@ print (input)
   assert equal "y" ($output | get 1)
 }
 
-# Test: Regex matcher - TODO: Fix record matcher detection
-# export def "test regex matcher" [] {
-#   let test_script = "
-# use modules/nu-mock *
-# 
-# mock register git {
-#   args: {type: regex, pattern: 'status --porcelain'}
-#   returns: 'regex matched'
-# }
-# 
-# def --wrapped git [...args] {
-#   let expectation = (mock get-expectation 'git' $args)
-#   $expectation.returns
-# }
-# 
-# git status --porcelain
-# "
-# 
-#   let output = (nu --no-config-file -c $test_script)
-#   assert equal "regex matched" $output
-# }
+# Test: Regex matcher
+export def "test regex matcher" [] {
+  let test_script = "
+use modules/nu-mock *
+
+mock register git {
+  args: {type: regex, pattern: 'status --porcelain'}
+  returns: 'regex matched'
+}
+
+def --wrapped git [...args] {
+  let expectation = (mock get-expectation 'git' $args)
+  $expectation.returns
+}
+
+git status --porcelain
+"
+
+  let output = (nu --no-config-file -c $test_script)
+  assert equal "regex matched" $output
+}
 
 # Test: Exit code handling
 export def "test exit code error" [] {

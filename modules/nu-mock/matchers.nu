@@ -78,12 +78,13 @@ export def "matcher apply" [
   }
 
   # If spec is a record, it's an advanced matcher
-  if $spec_type == "record" {
-    if ($matcher_spec | get -o type) == "regex" {
+  if ($spec_type | str starts-with "record") {
+    let matcher_type = ($matcher_spec | get -o type)
+    if $matcher_type == "regex" {
       # For regex, we need to match against all args joined
       let args_str = ($actual_args | str join " ")
       return (matcher regex $matcher_spec $args_str)
-    } else if ($matcher_spec | get -o type) == "contains" {
+    } else if $matcher_type == "contains" {
       return (matcher contains $matcher_spec $actual_args)
     }
   }
