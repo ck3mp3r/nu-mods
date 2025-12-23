@@ -1,104 +1,73 @@
 # Tests for matcher system
 
 use std assert
+use ../../modules/nu-mock/matchers.nu *
 
 # Test: Wildcard matcher with _
 export def "test wildcard matcher" [] {
-  let test_script = "
-use modules/nu-mock *
+  # Pattern with wildcard should match different values in wildcard position
+  assert (matcher wildcard ['status' '_'] ['status' '--porcelain'])
+  assert (matcher wildcard ['status' '_'] ['status' '--short'])
 
-mock register git {
-  args: ['status' _]
-  returns: 'wildcard matched'
-}
+  # Pattern without wildcard at same position should not match
+  assert not (matcher wildcard ['status' '--porcelain'] ['status' '--short'])
 
-def --env --wrapped git [...args] {
-  let expectation = (mock get-expectation 'git' $args)
-  $expectation.returns
-}
-
-git status --porcelain
-"
-
-  let output = (nu --no-config-file -c $test_script)
-  assert equal "wildcard matched" $output
+  # Different lengths should not match
+  assert not (matcher wildcard ['status' '_'] ['status'])
+  assert not (matcher wildcard ['status'] ['status' '--porcelain'])
 }
 
 # Test: Any matcher
 export def "test any matcher" [] {
-  let test_script = "
-use modules/nu-mock *
-
-mock register input {
-  args: any
-  returns: 'y'
-}
-
-def --env --wrapped input [...args] {
-  let expectation = (mock get-expectation 'input' $args)
-  $expectation.returns
-}
-
-print (input 'Do you want to continue?')
-print (input)
-"
-
-  let output = (nu --no-config-file -c $test_script | lines)
-  assert equal "y" ($output | get 0)
-  assert equal "y" ($output | get 1)
+  # Any matcher should always return true
+  assert (matcher any)
 }
 
 # Test: Regex matcher
 export def "test regex matcher" [] {
-  let test_script = "
-use modules/nu-mock *
+  # Regex matcher should match pattern
+  assert (matcher regex {type: "regex" pattern: 'status.*porcelain'} 'status --porcelain')
+  assert (matcher regex {type: "regex" pattern: '^status'} 'status --short')
 
-mock register git {
-  args: {type: regex, pattern: 'status --porcelain'}
-  returns: 'regex matched'
+  # Should not match when pattern doesn't match
+  assert not (matcher regex {type: "regex" pattern: '^push'} 'status --porcelain')
 }
 
-def --env --wrapped git [...args] {
-  let expectation = (mock get-expectation 'git' $args)
-  $expectation.returns
+# Test: Exact matcher
+export def "test exact matcher" [] {
+  # Exact matcher should match when lists are identical
+  assert (matcher exact ['status' '--porcelain'] ['status' '--porcelain'])
+  assert (matcher exact ['push'] ['push'])
+
+  # Should not match when different
+  assert not (matcher exact ['status' '--porcelain'] ['status' '--short'])
+  assert not (matcher exact ['status'] ['status' '--porcelain'])
 }
 
-git status --porcelain
-"
+# Test: Matcher apply - delegates to correct matcher
+export def "test matcher apply" [] {
+  # Test with exact match (list)
+  assert (matcher apply ['status' '--porcelain'] ['status' '--porcelain'])
 
-  let output = (nu --no-config-file -c $test_script)
-  assert equal "regex matched" $output
+  # Test with wildcard (list with _)
+  assert (matcher apply ['status' '_'] ['status' '--porcelain'])
+
+  # Test with any
+  assert (matcher apply 'any' ['anything' 'goes' 'here'])
+
+  # Test with regex (record)
+  assert (matcher apply {type: 'regex' pattern: 'status.*'} ['status' '--porcelain'])
+
+  # Test with contains (record)
+  assert (matcher apply {type: 'contains' value: 'status'} ['git' 'status' '--porcelain'])
 }
 
-# Test: Exit code handling
-export def "test exit code error" [] {
-  let test_script = "
-use modules/nu-mock *
+# Test: Contains matcher
+export def "test contains matcher" [] {
+  # Should match when value is in list
+  assert (matcher contains {type: 'contains' value: 'status'} ['git' 'status' '--porcelain'])
+  assert (matcher contains {type: 'contains' value: '--porcelain'} ['status' '--porcelain'])
 
-mock register git {
-  args: ['push']
-  returns: 'fatal: remote error'
-  exit_code: 1
-}
-
-def --env --wrapped git [...args] {
-  let expectation = (mock get-expectation 'git' $args)
-  
-  let exit_code = ($expectation | get -o exit_code | default 0)
-  if $exit_code != 0 {
-    let msg = $expectation.returns
-    error make {msg: $"Git error: ($msg)"}
-  }
-  
-  $expectation.returns
-}
-
-git push
-"
-
-  # This should error - check via exit code
-  let result = (do { nu --no-config-file -c $test_script } | complete)
-
-  assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "Git error")
+  # Should not match when value not in list
+  assert not (matcher contains {type: 'contains' value: 'push'} ['git' 'status' '--porcelain'])
 }

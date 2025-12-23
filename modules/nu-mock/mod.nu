@@ -1,5 +1,21 @@
 # nu-mock: Mocking framework for Nushell tests
-# Main module exports
+#
+# Usage:
+#   use modules/nu-mock *
+#
+#   # 1. Setup expectations
+#   mock register git { args: ['status'], returns: 'clean' }
+#   mock register git { args: ['push'], returns: 'success' }
+#
+#   # 2. Create wrapper for the command you want to mock
+#   def --env --wrapped git [...args] { mock call 'git' $args }
+#
+#   # 3. Use the command naturally
+#   git status  # Returns 'clean'
+#   git push    # Returns 'success'
+#
+#   # 4. Verify all expectations met
+#   mock verify
 
 # Initialize the registry (lazy initialization)
 def --env ensure-registry [] {
@@ -147,6 +163,32 @@ export def "mock verify" [] {
       }
     }
   }
+}
+
+# Execute a mock call - gets expectation AND records call automatically
+# This is what wrapped functions should use
+export def --env "mock call" [
+  fn_name: string
+  args: list
+] {
+  ensure-registry
+
+  # Get the expectation
+  let expectation = (mock get-expectation $fn_name $args)
+
+  # Record the call
+  mock record-call $fn_name $args
+
+  # Handle exit codes
+  let exit_code = ($expectation | get -o exit_code | default 0)
+  if $exit_code != 0 {
+    error make {
+      msg: $expectation.returns
+    }
+  }
+
+  # Return the mocked value
+  $expectation.returns
 }
 
 # Get all recorded calls for a function
