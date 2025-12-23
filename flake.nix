@@ -104,6 +104,12 @@
                 ];
               };
 
+          nu-mock = mkNuModule {
+            pname = "nu-mock";
+            src = ./modules/nu-mock;
+            description = "Mocking framework for Nushell testing";
+          };
+
           # Global package that bundles all modules
           default = pkgs.stdenvNoCC.mkDerivation {
             pname = "nu-mods";
@@ -114,6 +120,7 @@
               self.packages.${system}.common
               self.packages.${system}.ai
               self.packages.${system}.ci
+              self.packages.${system}.nu-mock
             ];
 
             dontBuild = true;
