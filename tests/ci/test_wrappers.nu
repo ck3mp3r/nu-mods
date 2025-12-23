@@ -6,7 +6,21 @@ use ../../modules/nu-mock *
 
 # Wrapped nix command
 export def --env --wrapped nix [...args] {
-  mock call 'nix' $args
+  # Check if this is a 'copy' command - it uses | complete
+  if ($args | first) == 'copy' {
+    let expectation = (mock get-expectation 'nix' $args)
+    mock record-call 'nix' $args
+
+    # Return complete-like record for copy commands
+    {
+      exit_code: ($expectation | get -o exit_code | default 0)
+      stdout: ($expectation | get -o stdout | default "")
+      stderr: ($expectation | get -o stderr | default "")
+    }
+  } else {
+    # Regular mock call for other commands
+    mock call 'nix' $args
+  }
 }
 
 # Wrapped cachix command - returns complete-like record

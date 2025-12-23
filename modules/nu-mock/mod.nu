@@ -29,35 +29,35 @@ def --env ensure-registry [] {
 
 # Register a mock expectation (--env to preserve state)
 export def --env "mock register" [
-  fn_name: string
+  command: string # External command/CLI name (e.g., 'git', 'nix', 'curl')
   spec: record
 ] {
   ensure-registry
 
-  let existing = ($env.__NU_MOCK_REGISTRY__.expectations | get -o $fn_name | default [])
+  let existing = ($env.__NU_MOCK_REGISTRY__.expectations | get -o $command | default [])
   $env.__NU_MOCK_REGISTRY__.expectations = (
     $env.__NU_MOCK_REGISTRY__.expectations
-    | upsert $fn_name ($existing | append $spec)
+    | upsert $command ($existing | append $spec)
   )
 }
 
-# Record a function call (--env to preserve state)
+# Record a command call (--env to preserve state)
 export def --env "mock record-call" [
-  fn_name: string
+  command: string # External command/CLI name
   args: list
 ] {
   ensure-registry
 
-  let existing_calls = ($env.__NU_MOCK_REGISTRY__.calls | get -o $fn_name | default [])
+  let existing_calls = ($env.__NU_MOCK_REGISTRY__.calls | get -o $command | default [])
   $env.__NU_MOCK_REGISTRY__.calls = (
     $env.__NU_MOCK_REGISTRY__.calls
-    | upsert $fn_name ($existing_calls | append {args: $args})
+    | upsert $command ($existing_calls | append {args: $args})
   )
 }
 
-# Get expectation for a function call and mark it consumed if times: 1 (--env to preserve state)
+# Get expectation for a command call and mark it consumed if times: 1 (--env to preserve state)
 export def --env "mock get-expectation" [
-  fn_name: string
+  command: string # External command/CLI name
   args: list
 ] {
   ensure-registry
@@ -66,12 +66,12 @@ export def --env "mock get-expectation" [
 
   let expectations = (
     $env.__NU_MOCK_REGISTRY__.expectations
-    | get -o $fn_name
+    | get -o $command
     | default []
   )
 
   if ($expectations | is-empty) {
-    error make {msg: $"No mock registered for '($fn_name)'"}
+    error make {msg: $"No mock registered for '($command)'"}
   }
 
   # Find first matching expectation and mark as consumed if needed
@@ -101,7 +101,7 @@ export def --env "mock get-expectation" [
 
   if $found_idx == -1 {
     error make {
-      msg: $"No matching expectation for '($fn_name)' with args ($args)"
+      msg: $"No matching expectation for '($command)' with args ($args)"
     }
   }
 
@@ -123,7 +123,7 @@ export def --env "mock get-expectation" [
 
     $env.__NU_MOCK_REGISTRY__.expectations = (
       $env.__NU_MOCK_REGISTRY__.expectations
-      | upsert $fn_name $updated_expectations
+      | upsert $command $updated_expectations
     )
   }
 
@@ -137,17 +137,17 @@ export def "mock verify" [] {
   let expectations = $env.__NU_MOCK_REGISTRY__.expectations
   let calls = $env.__NU_MOCK_REGISTRY__.calls
 
-  for fn_name in ($expectations | columns) {
-    let fn_expectations = ($expectations | get $fn_name)
-    let fn_calls = ($calls | get -o $fn_name | default [])
+  for command in ($expectations | columns) {
+    let cmd_expectations = ($expectations | get $command)
+    let cmd_calls = ($calls | get -o $command | default [])
 
-    for exp in $fn_expectations {
+    for exp in $cmd_expectations {
       let times = ($exp | get -o times | default null)
 
       if $times != null {
         # Count matching calls
         let matching_calls = (
-          $fn_calls
+          $cmd_calls
           | where {|call|
             use matchers.nu
             matchers matcher apply $exp.args $call.args
@@ -157,7 +157,7 @@ export def "mock verify" [] {
 
         if $matching_calls != $times {
           error make {
-            msg: $"Mock verification failed: '($fn_name)' with args ($exp.args) expected ($times) calls, got ($matching_calls)"
+            msg: $"Mock verification failed: '($command)' with args ($exp.args) expected ($times) calls, got ($matching_calls)"
           }
         }
       }
@@ -166,18 +166,18 @@ export def "mock verify" [] {
 }
 
 # Execute a mock call - gets expectation AND records call automatically
-# This is what wrapped functions should use
+# This is what wrapped commands should use
 export def --env "mock call" [
-  fn_name: string
+  command: string # External command/CLI name
   args: list
 ] {
   ensure-registry
 
   # Get the expectation
-  let expectation = (mock get-expectation $fn_name $args)
+  let expectation = (mock get-expectation $command $args)
 
   # Record the call
-  mock record-call $fn_name $args
+  mock record-call $command $args
 
   # Handle exit codes
   let exit_code = ($expectation | get -o exit_code | default 0)
@@ -191,11 +191,13 @@ export def --env "mock call" [
   $expectation.returns
 }
 
-# Get all recorded calls for a function
-export def "mock get-calls" [fn_name: string] {
+# Get all recorded calls for a command
+export def "mock get-calls" [
+  command: string # External command/CLI name
+] {
   ensure-registry
 
-  $env.__NU_MOCK_REGISTRY__.calls | get -o $fn_name | default []
+  $env.__NU_MOCK_REGISTRY__.calls | get -o $command | default []
 }
 
 # Reset all mocks (--env to preserve state)
