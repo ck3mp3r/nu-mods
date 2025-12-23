@@ -23,3 +23,8 @@ export def --env --wrapped git [...args] {
 export def --env --wrapped gh [...args] {
   mock call 'gh' $args
 }
+
+# Wrapped opencode command
+export def --env --wrapped opencode [...args] {
+  mock call 'opencode' $args
+}
