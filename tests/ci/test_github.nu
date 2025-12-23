@@ -2,7 +2,7 @@
 # Focus: Test PR and workflow operations
 
 use std/assert
-use ../../modules/nu-mock *
+use ../../modules/nu-mimic *
 use test_wrappers.nu * # Import wrapped commands FIRST
 use ../../modules/ci/github.nu * # Then import module under test
 
@@ -98,14 +98,14 @@ use modules/ci/github.nu *
 
 # Test 1: Check for existing PR - found
 export def --env "test ci github pr check finds existing pr" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "feature/test-branch"
   }
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--head' 'feature/test-branch' '--base' 'main' '--json' 'number,title,url']
     returns: '[{"number":42,"title":"Test PR","url":"https://github.com/user/repo/pull/42"}]'
   }
@@ -116,19 +116,19 @@ export def --env "test ci github pr check finds existing pr" [] {
   assert ($result.0.number == 42) $"Expected PR #42"
   assert ($result.0.title == "Test PR") $"Expected title 'Test PR'"
 
-  mock verify
+  mimic verify
 }
 
 # Test 2: Check for existing PR - not found
 export def --env "test ci github pr check no existing pr" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "feature/new-branch"
   }
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--head' 'feature/new-branch' '--base' 'main' '--json' 'number,title,url']
     returns: '[]'
   }
@@ -137,19 +137,19 @@ export def --env "test ci github pr check no existing pr" [] {
 
   assert (($result | length) == 0) $"Expected empty list but got: ($result)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 3: Get PR info by current branch
 export def --env "test ci github pr info current branch" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "feature/test"
   }
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--head' 'feature/test' '--json' 'number,title,state,mergedAt,mergeable,url,headRefName,baseRefName']
     returns: '[{"number":100,"title":"Test Feature","state":"OPEN","mergedAt":null,"mergeable":"MERGEABLE","url":"https://github.com/user/repo/pull/100","headRefName":"feature/test","baseRefName":"main"}]'
   }
@@ -162,14 +162,14 @@ export def --env "test ci github pr info current branch" [] {
   assert ($result.merged == false) $"Expected merged false"
   assert ($result.mergeable == "MERGEABLE") $"Expected mergeable"
 
-  mock verify
+  mimic verify
 }
 
 # Test 4: Get PR info by PR number
 export def --env "test ci github pr info by number" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'view' 42 '--json' 'number,title,state,mergedAt,mergeable,url,headRefName,baseRefName']
     returns: '{"number":42,"title":"Fix Bug","state":"MERGED","mergedAt":"2024-01-01T10:00:00Z","mergeable":"UNKNOWN","url":"https://github.com/user/repo/pull/42","headRefName":"fix/bug","baseRefName":"main"}'
   }
@@ -181,14 +181,14 @@ export def --env "test ci github pr info by number" [] {
   assert ($result.state == "MERGED") $"Expected state MERGED"
   assert ($result.merged == true) $"Expected merged true"
 
-  mock verify
+  mimic verify
 }
 
 # Test 5: Get PR info by branch name
 export def --env "test ci github pr info by branch" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--head' 'feature/new' '--json' 'number,title,state,mergedAt,mergeable,url,headRefName,baseRefName']
     returns: '[{"number":99,"title":"New Feature","state":"OPEN","mergedAt":null,"mergeable":"CONFLICTING","url":"https://github.com/user/repo/pull/99","headRefName":"feature/new","baseRefName":"develop"}]'
   }
@@ -200,14 +200,14 @@ export def --env "test ci github pr info by branch" [] {
   assert ($result.mergeable == "CONFLICTING") $"Expected CONFLICTING"
   assert ($result.base_branch == "develop") $"Expected base develop"
 
-  mock verify
+  mimic verify
 }
 
 # Test 6: Get PR info - not found
 export def --env "test ci github pr info not found" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--head' 'nonexistent' '--json' 'number,title,state,mergedAt,mergeable,url,headRefName,baseRefName']
     returns: '[]'
   }
@@ -217,14 +217,14 @@ export def --env "test ci github pr info not found" [] {
   assert ($result.status == "not_found") $"Expected not_found status"
   assert ($result.error != null) $"Expected error message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 7: Create new PR
 export def --env "test ci github pr create new" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'create' '--title' 'feat: add feature' '--body' 'Description here' '--base' 'main']
     returns: "https://github.com/user/repo/pull/43"
   }
@@ -234,14 +234,14 @@ export def --env "test ci github pr create new" [] {
   assert ($result.status == "success") $"Expected success status but got: ($result.status)"
   assert ($result.number == 43) $"Expected PR #43 but got: ($result.number)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 4: Create draft PR
 export def --env "test ci github pr create draft" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'create' '--title' 'wip: feature' '--body' 'Draft description' '--base' 'develop' '--draft']
     returns: "https://github.com/user/repo/pull/44"
   }
@@ -251,7 +251,7 @@ export def --env "test ci github pr create draft" [] {
   assert ($result.status == "success") $"Expected success status but got: ($result.status)"
   assert ($result.number == 44) $"Expected PR #44 but got: ($result.number)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 5: Update existing PR
@@ -275,9 +275,9 @@ export def --env "test ci github pr create draft" [] {
 
 # Test 6: Merge PR with squash (default)
 export def --env "test ci github pr merge squash default" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'merge' 123 '--squash']
     returns: "Merged PR #123"
   }
@@ -287,14 +287,14 @@ export def --env "test ci github pr merge squash default" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.pr_number == 123) $"Expected PR 123"
 
-  mock verify
+  mimic verify
 }
 
 # Test 7: Merge PR with merge method
 export def --env "test ci github pr merge with method" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'merge' 456 '--merge']
     returns: "Merged PR #456"
   }
@@ -303,14 +303,14 @@ export def --env "test ci github pr merge with method" [] {
 
   assert ($result.status == "success") $"Expected success"
 
-  mock verify
+  mimic verify
 }
 
 # Test 8: Merge PR with auto-merge enabled
 export def --env "test ci github pr merge auto" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'merge' 789 '--squash' '--auto']
     returns: "Merged PR #789"
   }
@@ -319,14 +319,14 @@ export def --env "test ci github pr merge auto" [] {
 
   assert ($result.status == "success") $"Expected success"
 
-  mock verify
+  mimic verify
 }
 
 # Test 9: Merge PR failure
 export def --env "test ci github pr merge failure" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'merge' 999 '--squash']
     returns: "Error: PR has conflicts"
     exit_code: 1
@@ -337,14 +337,14 @@ export def --env "test ci github pr merge failure" [] {
   assert ($result.status == "failed") $"Expected failed status"
   assert ($result.error != null) $"Expected error message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 10: List PRs with state filter
 export def --env "test ci github pr list with filter" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['pr' 'list' '--state' 'open' '--json' 'number,title,author' '--limit' 30]
     returns: '[{"number":1,"title":"First PR","author":{"login":"user1"}},{"number":2,"title":"Second PR","author":{"login":"user2"}}]'
   }
@@ -357,7 +357,7 @@ export def --env "test ci github pr list with filter" [] {
   assert ($result.1.number == 2) $"Expected PR #2"
   assert ($result.1.title == "Second PR") $"Expected 'Second PR'"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -366,9 +366,9 @@ export def --env "test ci github pr list with filter" [] {
 
 # Test 7: List workflow runs
 export def --env "test ci github workflow list" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'list' '--json' 'databaseId,status,conclusion,name,headBranch' '--limit' 20]
     returns: '[{"databaseId":123,"status":"completed","conclusion":"success","name":"CI","headBranch":"main"},{"databaseId":124,"status":"in_progress","conclusion":null,"name":"Tests","headBranch":"feature"}]'
   }
@@ -382,14 +382,14 @@ export def --env "test ci github workflow list" [] {
   assert ($result.1.databaseId == 124) $"Expected run ID 124"
   assert ($result.1.status == "in_progress") $"Expected status 'in_progress'"
 
-  mock verify
+  mimic verify
 }
 
 # Test 8: Filter workflows by status
 export def --env "test ci github workflow list filter by status" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'list' '--status' 'failure' '--json' 'databaseId,status,conclusion,name,headBranch' '--limit' 20]
     returns: '[{"databaseId":125,"status":"completed","conclusion":"failure","name":"Build","headBranch":"develop"}]'
   }
@@ -401,14 +401,14 @@ export def --env "test ci github workflow list filter by status" [] {
   assert ($result.0.conclusion == "failure") $"Expected conclusion 'failure'"
   assert ($result.0.name == "Build") $"Expected workflow name 'Build'"
 
-  mock verify
+  mimic verify
 }
 
 # Test 9: View specific workflow run
 export def --env "test ci github workflow view" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'view' 123 '--json' 'databaseId,status,conclusion,name,headBranch,createdAt,jobs']
     returns: '{"databaseId":123,"status":"completed","conclusion":"success","name":"CI","headBranch":"main","createdAt":"2024-01-01T10:00:00Z","jobs":[{"name":"build","status":"completed","conclusion":"success"}]}'
   }
@@ -423,14 +423,14 @@ export def --env "test ci github workflow view" [] {
   assert (($result.jobs | length) == 1) $"Expected 1 job"
   assert ($result.jobs.0.name == "build") $"Expected job name 'build'"
 
-  mock verify
+  mimic verify
 }
 
 # Test 10: Get workflow logs
 export def --env "test ci github workflow logs" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'view' 123 '--log']
     returns: "Build log output\nTest results\nSuccess!"
   }
@@ -438,14 +438,14 @@ export def --env "test ci github workflow logs" [] {
   ci github workflow logs 123
 
   # Just verify the correct command was called
-  mock verify
+  mimic verify
 }
 
 # Test 11: Cancel workflow run
 export def --env "test ci github workflow cancel" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'cancel' 124]
     returns: ""
   }
@@ -455,14 +455,14 @@ export def --env "test ci github workflow cancel" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.run_id == 124) $"Expected run_id 124"
 
-  mock verify
+  mimic verify
 }
 
 # Test 12: Rerun workflow
 export def --env "test ci github workflow rerun" [] {
-  mock reset
+  mimic reset
 
-  mock register gh {
+  mimic register gh {
     args: ['run' 'rerun' 125]
     returns: ""
   }
@@ -472,5 +472,5 @@ export def --env "test ci github workflow rerun" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.run_id == 125) $"Expected run_id 125"
 
-  mock verify
+  mimic verify
 }

@@ -1,62 +1,62 @@
-# nu-mock: Mocking framework for Nushell tests
+# nu-mimic: Mocking framework for Nushell tests
 #
 # Usage:
-#   use modules/nu-mock *
+#   use modules/nu-mimic *
 #
 #   # 1. Setup expectations
-#   mock register git { args: ['status'], returns: 'clean' }
-#   mock register git { args: ['push'], returns: 'success' }
+#   mimic register git { args: ['status'], returns: 'clean' }
+#   mimic register git { args: ['push'], returns: 'success' }
 #
-#   # 2. Create wrapper for the command you want to mock
-#   def --env --wrapped git [...args] { mock call 'git' $args }
+#   # 2. Create wrapper for the command you want to mimic
+#   def --env --wrapped git [...args] { mimic call 'git' $args }
 #
 #   # 3. Use the command naturally
 #   git status  # Returns 'clean'
 #   git push    # Returns 'success'
 #
 #   # 4. Verify all expectations met
-#   mock verify
+#   mimic verify
 
 # Initialize the registry (lazy initialization)
 def --env ensure-registry [] {
-  if '__NU_MOCK_REGISTRY__' not-in ($env | columns) {
-    $env.__NU_MOCK_REGISTRY__ = {
+  if '__NU_MIMIC_REGISTRY__' not-in ($env | columns) {
+    $env.__NU_MIMIC_REGISTRY__ = {
       expectations: {}
       calls: {}
     }
   }
 }
 
-# Register a mock expectation (--env to preserve state)
-export def --env "mock register" [
+# Register a mimic expectation (--env to preserve state)
+export def --env "mimic register" [
   command: string # External command/CLI name (e.g., 'git', 'nix', 'curl')
   spec: record
 ] {
   ensure-registry
 
-  let existing = ($env.__NU_MOCK_REGISTRY__.expectations | get -o $command | default [])
-  $env.__NU_MOCK_REGISTRY__.expectations = (
-    $env.__NU_MOCK_REGISTRY__.expectations
+  let existing = ($env.__NU_MIMIC_REGISTRY__.expectations | get -o $command | default [])
+  $env.__NU_MIMIC_REGISTRY__.expectations = (
+    $env.__NU_MIMIC_REGISTRY__.expectations
     | upsert $command ($existing | append $spec)
   )
 }
 
 # Record a command call (--env to preserve state)
-export def --env "mock record-call" [
+export def --env "mimic record-call" [
   command: string # External command/CLI name
   args: list
 ] {
   ensure-registry
 
-  let existing_calls = ($env.__NU_MOCK_REGISTRY__.calls | get -o $command | default [])
-  $env.__NU_MOCK_REGISTRY__.calls = (
-    $env.__NU_MOCK_REGISTRY__.calls
+  let existing_calls = ($env.__NU_MIMIC_REGISTRY__.calls | get -o $command | default [])
+  $env.__NU_MIMIC_REGISTRY__.calls = (
+    $env.__NU_MIMIC_REGISTRY__.calls
     | upsert $command ($existing_calls | append {args: $args})
   )
 }
 
 # Get expectation for a command call and mark it consumed if times: 1 (--env to preserve state)
-export def --env "mock get-expectation" [
+export def --env "mimic get-expectation" [
   command: string # External command/CLI name
   args: list
 ] {
@@ -65,13 +65,13 @@ export def --env "mock get-expectation" [
   use matchers.nu
 
   let expectations = (
-    $env.__NU_MOCK_REGISTRY__.expectations
+    $env.__NU_MIMIC_REGISTRY__.expectations
     | get -o $command
     | default []
   )
 
   if ($expectations | is-empty) {
-    error make {msg: $"No mock registered for '($command)'"}
+    error make {msg: $"No mimic registered for '($command)'"}
   }
 
   # Find first matching expectation and mark as consumed if needed
@@ -121,8 +121,8 @@ export def --env "mock get-expectation" [
       }
     )
 
-    $env.__NU_MOCK_REGISTRY__.expectations = (
-      $env.__NU_MOCK_REGISTRY__.expectations
+    $env.__NU_MIMIC_REGISTRY__.expectations = (
+      $env.__NU_MIMIC_REGISTRY__.expectations
       | upsert $command $updated_expectations
     )
   }
@@ -131,11 +131,11 @@ export def --env "mock get-expectation" [
 }
 
 # Verify all expectations were met
-export def "mock verify" [] {
+export def "mimic verify" [] {
   ensure-registry
 
-  let expectations = $env.__NU_MOCK_REGISTRY__.expectations
-  let calls = $env.__NU_MOCK_REGISTRY__.calls
+  let expectations = $env.__NU_MIMIC_REGISTRY__.expectations
+  let calls = $env.__NU_MIMIC_REGISTRY__.calls
 
   for command in ($expectations | columns) {
     let cmd_expectations = ($expectations | get $command)
@@ -157,7 +157,7 @@ export def "mock verify" [] {
 
         if $matching_calls != $times {
           error make {
-            msg: $"Mock verification failed: '($command)' with args ($exp.args) expected ($times) calls, got ($matching_calls)"
+            msg: $"Mimic verification failed: '($command)' with args ($exp.args) expected ($times) calls, got ($matching_calls)"
           }
         }
       }
@@ -165,19 +165,19 @@ export def "mock verify" [] {
   }
 }
 
-# Execute a mock call - gets expectation AND records call automatically
+# Execute a mimic call - gets expectation AND records call automatically
 # This is what wrapped commands should use
-export def --env "mock call" [
+export def --env "mimic call" [
   command: string # External command/CLI name
   args: list
 ] {
   ensure-registry
 
   # Get the expectation
-  let expectation = (mock get-expectation $command $args)
+  let expectation = (mimic get-expectation $command $args)
 
   # Record the call
-  mock record-call $command $args
+  mimic record-call $command $args
 
   # Handle exit codes
   let exit_code = ($expectation | get -o exit_code | default 0)
@@ -192,19 +192,19 @@ export def --env "mock call" [
 }
 
 # Get all recorded calls for a command
-export def "mock get-calls" [
+export def "mimic get-calls" [
   command: string # External command/CLI name
 ] {
   ensure-registry
 
-  $env.__NU_MOCK_REGISTRY__.calls | get -o $command | default []
+  $env.__NU_MIMIC_REGISTRY__.calls | get -o $command | default []
 }
 
-# Reset all mocks (--env to preserve state)
-export def --env "mock reset" [] {
+# Reset all mimics (--env to preserve state)
+export def --env "mimic reset" [] {
   ensure-registry
 
-  $env.__NU_MOCK_REGISTRY__ = {
+  $env.__NU_MIMIC_REGISTRY__ = {
     expectations: {}
     calls: {}
   }

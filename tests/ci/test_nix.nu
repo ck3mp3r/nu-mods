@@ -2,7 +2,7 @@
 # Focus: Test flake operations with stdin/table outputs and cache management
 
 use std/assert
-use ../../modules/nu-mock *
+use ../../modules/nu-mimic *
 use test_wrappers.nu * # Import wrapped commands FIRST
 use ../../modules/ci/nix.nu * # Then import module under test
 
@@ -12,10 +12,10 @@ use ../../modules/ci/nix.nu * # Then import module under test
 
 # Test 1: Check single flake (default)
 export def --env "test ci nix check single flake" [] {
-  mock reset
+  mimic reset
 
   # Setup expectations
-  mock register nix {
+  mimic register nix {
     args: ['flake' 'check' '--no-update-lock-file']
     returns: ''
   }
@@ -27,7 +27,7 @@ export def --env "test ci nix check single flake" [] {
   assert ($result.0.flake == ".") $"Expected flake '.' but got: ($result.0.flake)"
   assert ($result.0.status == "success") $"Expected success but got: ($result.0.status)"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -36,9 +36,9 @@ export def --env "test ci nix check single flake" [] {
 
 # Test 13: Get closure of single path
 export def --env "test ci nix closure single path" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--recursive' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg\n/nix/store/dep1\n/nix/store/dep2"
   }
@@ -50,19 +50,19 @@ export def --env "test ci nix closure single path" [] {
   assert ($result.1 == "/nix/store/dep1") $"Expected dep1"
   assert ($result.2 == "/nix/store/dep2") $"Expected dep2"
 
-  mock verify
+  mimic verify
 }
 
 # Test 14: Get closure of multiple paths
 export def --env "test ci nix closure multiple paths" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--recursive' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg\n/nix/store/dep1"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--recursive' '/nix/store/xyz-pkg']
     returns: "/nix/store/xyz-pkg\n/nix/store/dep2"
   }
@@ -75,12 +75,12 @@ export def --env "test ci nix closure multiple paths" [] {
   assert ("/nix/store/dep1" in $result) $"Expected dep1 in closure"
   assert ("/nix/store/dep2" in $result) $"Expected dep2 in closure"
 
-  mock verify
+  mimic verify
 }
 
 # Test 15: Get closure with empty input
 export def --env "test ci nix closure empty input" [] {
-  mock reset
+  mimic reset
 
   let result = ([] | ci nix closure)
 
@@ -93,14 +93,14 @@ export def --env "test ci nix closure empty input" [] {
 
 # Test 16: Push single path to cache
 export def --env "test ci nix cache push single path" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg"
   }
 
-  mock register cachix {
+  mimic register cachix {
     args: ['push' 'cachix' '/nix/store/abc-pkg']
     returns: ""
     exit_code: 0
@@ -112,31 +112,31 @@ export def --env "test ci nix cache push single path" [] {
   assert ($result.0.status == "success") $"Expected success"
   assert ($result.0.cache == "cachix") $"Expected cachix cache"
 
-  mock verify
+  mimic verify
 }
 
 # Test 14: Push multiple paths to cache
 export def --env "test ci nix cache push multiple paths" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc']
     returns: "/nix/store/abc"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/def']
     returns: "/nix/store/def"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['copy' '--to' 's3://bucket' '/nix/store/abc']
     returns: ""
     stdout: ""
     stderr: ""
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['copy' '--to' 's3://bucket' '/nix/store/def']
     returns: ""
     stdout: ""
@@ -149,29 +149,29 @@ export def --env "test ci nix cache push multiple paths" [] {
   assert ($result.0.status == "success") $"Expected success for path 0"
   assert ($result.1.status == "success") $"Expected success for path 1"
 
-  mock verify
+  mimic verify
 }
 
 # Test 15: Pipeline - build and push to cache
 export def --env "test ci nix build and push pipeline" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['eval' '--impure' '--expr' 'builtins.currentSystem']
     returns: "\"x86_64-linux\""
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['build' '.#pkg1' '--print-out-paths' '--no-update-lock-file']
     returns: "/nix/store/abc-pkg1"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc-pkg1']
     returns: "/nix/store/abc-pkg1"
   }
 
-  mock register cachix {
+  mimic register cachix {
     args: ['push' 'cachix' '/nix/store/abc-pkg1']
     returns: ""
   }
@@ -181,19 +181,19 @@ export def --env "test ci nix build and push pipeline" [] {
   assert (($result | length) == 1) $"Expected 1 push result"
   assert ($result.0.path == "/nix/store/abc-pkg1") $"Expected correct path"
 
-  mock verify
+  mimic verify
 }
 
 # Test 16: Check upstream cache (path cached)
 export def --env "test ci nix cache check upstream cached" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg"
   }
@@ -205,19 +205,19 @@ export def --env "test ci nix cache check upstream cached" [] {
   assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream to be set"
   assert ($result.0.cache == null) $"Expected no cache push in dry-run"
 
-  mock verify
+  mimic verify
 }
 
 # Test 17: Check upstream cache (path not cached)
 export def --env "test ci nix cache check upstream not cached" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/xyz-pkg']
     returns: "/nix/store/xyz-pkg"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/xyz-pkg']
     returns: ""
     exit_code: 1
@@ -229,25 +229,25 @@ export def --env "test ci nix cache check upstream not cached" [] {
   assert ($result.0.cached == false) $"Expected path to not be cached"
   assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream to be set"
 
-  mock verify
+  mimic verify
 }
 
 # Test 18: Check upstream and push to target cache (path not in upstream)
 export def --env "test ci nix cache check and push" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/abc-pkg']
     returns: ""
     exit_code: 1
   }
 
-  mock register cachix {
+  mimic register cachix {
     args: ['push' 'cachix' '/nix/store/abc-pkg']
     returns: ""
   }
@@ -260,19 +260,19 @@ export def --env "test ci nix cache check and push" [] {
   assert ($result.0.cache == "cachix") $"Expected push to cachix"
   assert ($result.0.status == "success") $"Expected successful push"
 
-  mock verify
+  mimic verify
 }
 
 # Test 19: Check upstream and skip push when already cached
 export def --env "test ci nix cache skip when upstream cached" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/xyz-pkg']
     returns: "/nix/store/xyz-pkg"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/xyz-pkg']
     returns: "/nix/store/xyz-pkg"
   }
@@ -285,19 +285,19 @@ export def --env "test ci nix cache skip when upstream cached" [] {
   assert ($result.0.cache == "cachix") $"Expected cache target set"
   assert ($result.0.status == "skipped") $"Expected skipped status for cached path"
 
-  mock verify
+  mimic verify
 }
 
 # Test 20: Dry-run status should be "dry-run" not "success"
 export def --env "test ci nix cache dry-run status" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '/nix/store/abc-pkg']
     returns: "/nix/store/abc-pkg"
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/abc-pkg']
     returns: ""
     exit_code: 1
@@ -309,7 +309,7 @@ export def --env "test ci nix cache dry-run status" [] {
   assert ($result.0.status == "dry-run") $"Expected dry-run status, not success"
   assert ($result.0.cache == null) $"Expected no cache in dry-run"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -318,9 +318,9 @@ export def --env "test ci nix cache dry-run status" [] {
 
 # Test 21: Check with --impure flag
 export def --env "test ci nix check with impure" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['flake' 'check' '--impure' '--no-update-lock-file']
     returns: ''
   }
@@ -329,14 +329,14 @@ export def --env "test ci nix check with impure" [] {
 
   assert ($result.0.status == "success") $"Expected success with --impure"
 
-  mock verify
+  mimic verify
 }
 
 # Test 22: Check with --args
 export def --env "test ci nix check with args" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['flake' 'check' '--verbose' '--option' 'cores' '4' '--no-update-lock-file']
     returns: ''
   }
@@ -345,19 +345,19 @@ export def --env "test ci nix check with args" [] {
 
   assert ($result.0.status == "success") $"Expected success with --args"
 
-  mock verify
+  mimic verify
 }
 
 # Test 23: Build with --impure flag
 export def --env "test ci nix build with impure" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['eval' '--impure' '--expr' 'builtins.currentSystem']
     returns: "\"x86_64-linux\""
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['build' '.#mypackage' '--print-out-paths' '--no-update-lock-file' '--impure']
     returns: "/nix/store/xyz-mypackage"
   }
@@ -367,19 +367,19 @@ export def --env "test ci nix build with impure" [] {
   assert ($result.0.status == "success") $"Expected success with --impure"
   assert ($result.0.path == "/nix/store/xyz-mypackage") $"Expected store path"
 
-  mock verify
+  mimic verify
 }
 
 # Test 24: Build with --args
 export def --env "test ci nix build with args" [] {
-  mock reset
+  mimic reset
 
-  mock register nix {
+  mimic register nix {
     args: ['eval' '--impure' '--expr' 'builtins.currentSystem']
     returns: "\"x86_64-linux\""
   }
 
-  mock register nix {
+  mimic register nix {
     args: ['build' '.#mypackage' '--print-out-paths' '--no-update-lock-file' '--option' 'cores' '8']
     returns: "/nix/store/xyz-mypackage"
   }
@@ -388,7 +388,7 @@ export def --env "test ci nix build with args" [] {
 
   assert ($result.0.status == "success") $"Expected success with --args"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================

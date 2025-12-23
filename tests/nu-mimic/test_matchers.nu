@@ -1,7 +1,7 @@
 # Tests for matcher system
 
 use std assert
-use ../../modules/nu-mock/matchers.nu *
+use ../../modules/nu-mimic/matchers.nu *
 
 # Test: Wildcard matcher with _
 export def "test wildcard matcher" [] {

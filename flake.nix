@@ -104,9 +104,9 @@
                 ];
               };
 
-          nu-mock = mkNuModule {
-            pname = "nu-mock";
-            src = ./modules/nu-mock;
+          nu-mimic = mkNuModule {
+            pname = "nu-mimic";
+            src = ./modules/nu-mimic;
             description = "Mocking framework for Nushell testing";
           };
 
@@ -120,7 +120,7 @@
               self.packages.${system}.common
               self.packages.${system}.ai
               self.packages.${system}.ci
-              self.packages.${system}.nu-mock
+              self.packages.${system}.nu-mimic
             ];
 
             dontBuild = true;
@@ -141,7 +141,7 @@
                   self.packages.${system}.common
                   self.packages.${system}.ai
                   self.packages.${system}.ci
-                  self.packages.${system}.nu-mock
+                  self.packages.${system}.nu-mimic
                 ]}
 
               # Copy any additional files (README, etc.)
@@ -185,7 +185,7 @@
           nu-mods-common = self.packages.${prev.system}.common;
           nu-mods-ai = self.packages.${prev.system}.ai;
           nu-mods-ci = self.packages.${prev.system}.ci;
-          nu-mods-nu-mock = self.packages.${prev.system}.nu-mock;
+          nu-mods-nu-mimic = self.packages.${prev.system}.nu-mimic;
         };
       };
     };
