@@ -2,41 +2,41 @@
 # Focus: Test branch creation with different flow types and ticket IDs
 
 use std/assert
-use ../../modules/nu-mock *
+use ../../modules/nu-mimic *
 use test_wrappers.nu * # Import wrapped commands FIRST
 use ../../modules/ci/scm.nu * # Then import module under test
 
 # Test 1: Feature branch with ticket ID via --prefix flag
 export def --env "test ci scm branch feature with ticket prefix" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "main"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'main']
     returns: "Already on 'main'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'JIRA-1234/feature/add-login']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'JIRA-1234/feature/add-login']
     returns: "Switched to a new branch 'JIRA-1234/feature/add-login'"
   }
@@ -47,40 +47,40 @@ export def --env "test ci scm branch feature with ticket prefix" [] {
   assert ($result.branch == "JIRA-1234/feature/add-login") $"Expected branch name with ticket but got: ($result.branch)"
   assert ($result.rebased == false) $"Expected rebased to be false"
 
-  mock verify
+  mimic verify
 }
 
 # Test 2: Release branch with ticket ID
 export def --env "test ci scm branch release with ticket" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "develop"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'main']
     returns: "Switched to branch 'main'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'PROJ-500/release/v2.1.0']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'PROJ-500/release/v2.1.0']
     returns: "Switched to a new branch 'PROJ-500/release/v2.1.0'"
   }
@@ -90,40 +90,40 @@ export def --env "test ci scm branch release with ticket" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.branch == "PROJ-500/release/v2.1.0") $"Expected release branch but got: ($result.branch)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 3: Hotfix branch from custom base
 export def --env "test ci scm branch hotfix with custom base" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "develop"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'production']
     returns: "Switched to branch 'production'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'SEC-999/hotfix/patch-vulnerability']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'SEC-999/hotfix/patch-vulnerability']
     returns: "Switched to a new branch 'SEC-999/hotfix/patch-vulnerability'"
   }
@@ -134,40 +134,40 @@ export def --env "test ci scm branch hotfix with custom base" [] {
   assert ($result.branch == "SEC-999/hotfix/patch-vulnerability") $"Expected hotfix branch but got: ($result.branch)"
   assert ($result.rebased == false) $"Expected rebased to be false"
 
-  mock verify
+  mimic verify
 }
 
 # Test 4: Fix branch without ticket ID
 export def --env "test ci scm branch fix without ticket" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "main"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'main']
     returns: "Already on 'main'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'fix/login-bug']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'fix/login-bug']
     returns: "Switched to a new branch 'fix/login-bug'"
   }
@@ -177,40 +177,40 @@ export def --env "test ci scm branch fix without ticket" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.branch == "fix/login-bug") $"Expected fix branch without ticket but got: ($result.branch)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 5: Chore branch with description sanitization
 export def --env "test ci scm branch sanitizes description" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "main"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'main']
     returns: "Already on 'main'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'MAINT-100/chore/update-dependencies-and-cleanup']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'MAINT-100/chore/update-dependencies-and-cleanup']
     returns: "Switched to a new branch"
   }
@@ -221,14 +221,14 @@ export def --env "test ci scm branch sanitizes description" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.branch == "MAINT-100/chore/update-dependencies-and-cleanup") $"Expected sanitized branch but got: ($result.branch)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 7: Error handling - not a git repo
 export def --env "test ci scm branch error not git repo" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: "fatal: not a git repository"
     exit_code: 128
@@ -240,40 +240,40 @@ export def --env "test ci scm branch error not git repo" [] {
   assert ($result.branch == null) $"Expected null branch"
   assert ($result.error != null) $"Expected error message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 8: Default to feature when no flow flag provided
 export def --env "test ci scm branch defaults to feature" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "main"
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' 'main']
     returns: "Already on 'main'"
   }
 
-  mock register git {
+  mimic register git {
     args: ['pull']
     returns: "Already up to date."
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--verify' 'feature/default-test']
     returns: ""
     exit_code: 128
   }
 
-  mock register git {
+  mimic register git {
     args: ['switch' '-c' 'feature/default-test']
     returns: "Switched to a new branch 'feature/default-test'"
   }
@@ -283,7 +283,7 @@ export def --env "test ci scm branch defaults to feature" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.branch == "feature/default-test") $"Expected feature branch by default but got: ($result.branch)"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -292,19 +292,19 @@ export def --env "test ci scm branch defaults to feature" [] {
 
 # Test 9: Commit specific files with message
 export def --env "test ci scm commit with files and message" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' 'file1.txt' 'file2.txt']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['commit' '-m' 'feat: add new feature']
     returns: "[main abc123] feat: add new feature"
   }
@@ -314,24 +314,24 @@ export def --env "test ci scm commit with files and message" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.message == "feat: add new feature") $"Expected message but got: ($result.message)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 10: Commit with custom message  
 export def --env "test ci scm commit with custom message" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' '-A']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['commit' '-m' 'test message']
     returns: "[main def456] test message"
   }
@@ -341,24 +341,24 @@ export def --env "test ci scm commit with custom message" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.message == "test message") $"Expected test message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 11: Commit single file via string input
 export def --env "test ci scm commit single file" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' 'flake.lock']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['commit' '-m' 'chore: update flake.lock']
     returns: "[main ghi789] chore: update flake.lock"
   }
@@ -367,24 +367,24 @@ export def --env "test ci scm commit single file" [] {
 
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
 
-  mock verify
+  mimic verify
 }
 
 # Test 12: Commit with no changes
 export def --env "test ci scm commit no changes" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' '-A']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['diff' '--cached' '--name-only']
     returns: ""
   }
@@ -394,19 +394,19 @@ export def --env "test ci scm commit no changes" [] {
   assert ($result.status == "success") $"Expected success status"
   assert ($result.message == "No changes to commit") $"Expected no changes message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 13: Commit failure handling
 export def --env "test ci scm commit failure" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' 'file.txt']
     returns: "fatal: pathspec 'file.txt' did not match any files"
     exit_code: 128
@@ -418,34 +418,34 @@ export def --env "test ci scm commit failure" [] {
   assert ($result.error != null) $"Expected error message"
   assert ($result.pushed == false) $"Expected pushed to be false"
 
-  mock verify
+  mimic verify
 }
 
 # Test 14: Commit with push flag
 export def --env "test ci scm commit with push" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' '-A']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['commit' '-m' 'feat: add feature']
     returns: "[main abc123] feat: add feature"
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "feature/test-branch"
   }
 
-  mock register git {
+  mimic register git {
     args: ['push' 'origin' 'feature/test-branch']
     returns: "To github.com:user/repo.git"
   }
@@ -456,34 +456,34 @@ export def --env "test ci scm commit with push" [] {
   assert ($result.pushed == true) $"Expected pushed to be true"
   assert ($result.message == "feat: add feature") $"Expected commit message"
 
-  mock verify
+  mimic verify
 }
 
 # Test 15: Commit with push failure
 export def --env "test ci scm commit push failure" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['add' '-A']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['commit' '-m' 'test']
     returns: "[main def456] test"
   }
 
-  mock register git {
+  mimic register git {
     args: ['rev-parse' '--abbrev-ref' 'HEAD']
     returns: "main"
   }
 
-  mock register git {
+  mimic register git {
     args: ['push' 'origin' 'main']
     returns: "fatal: remote error"
     exit_code: 1
@@ -495,7 +495,7 @@ export def --env "test ci scm commit push failure" [] {
   assert ($result.pushed == false) $"Expected pushed to be false"
   assert ($result.error != null) $"Expected push error message"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -504,19 +504,19 @@ export def --env "test ci scm commit push failure" [] {
 
 # Test 16: Get all changes since branch created
 export def --env "test ci scm changes all files" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['merge-base' 'HEAD' 'main']
     returns: "abc123def456"
   }
 
-  mock register git {
+  mimic register git {
     args: ['diff' '--name-only' 'abc123def456']
     returns: "file1.txt\nfile2.nu\nsrc/main.nu"
   }
@@ -528,24 +528,24 @@ export def --env "test ci scm changes all files" [] {
   assert ($result | any {|f| $f == "file2.nu" }) $"Expected file2.nu"
   assert ($result | any {|f| $f == "src/main.nu" }) $"Expected src/main.nu"
 
-  mock verify
+  mimic verify
 }
 
 # Test 17: Get changes with custom base branch
 export def --env "test ci scm changes custom base" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['merge-base' 'HEAD' 'develop']
     returns: "xyz789abc"
   }
 
-  mock register git {
+  mimic register git {
     args: ['diff' '--name-only' 'xyz789abc']
     returns: "README.md\ndocs/guide.md"
   }
@@ -556,19 +556,19 @@ export def --env "test ci scm changes custom base" [] {
   assert ($result | any {|f| $f == "README.md" }) $"Expected README.md"
   assert ($result | any {|f| $f == "docs/guide.md" }) $"Expected docs/guide.md"
 
-  mock verify
+  mimic verify
 }
 
 # Test 18: Get only staged files
 export def --env "test ci scm changes staged only" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['diff' '--cached' '--name-only']
     returns: "staged1.nu\nstaged2.txt"
   }
@@ -579,24 +579,24 @@ export def --env "test ci scm changes staged only" [] {
   assert ($result | any {|f| $f == "staged1.nu" }) $"Expected staged1.nu"
   assert ($result | any {|f| $f == "staged2.txt" }) $"Expected staged2.txt"
 
-  mock verify
+  mimic verify
 }
 
 # Test 19: No changes returns empty list
 export def --env "test ci scm changes no changes" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['status' '--porcelain']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['merge-base' 'HEAD' 'main']
     returns: "abc123"
   }
 
-  mock register git {
+  mimic register git {
     args: ['diff' '--name-only' 'abc123']
     returns: ""
   }
@@ -605,7 +605,7 @@ export def --env "test ci scm changes no changes" [] {
 
   assert (($result | length) == 0) $"Expected empty list"
 
-  mock verify
+  mimic verify
 }
 
 # ============================================================================
@@ -614,14 +614,14 @@ export def --env "test ci scm changes no changes" [] {
 
 # Test 20: Config with email auto-derives name
 export def --env "test ci scm config auto derive name" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.name' 'john doe']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.email' 'john.doe@example.com']
     returns: ""
   }
@@ -633,19 +633,19 @@ export def --env "test ci scm config auto derive name" [] {
   assert ($result.email == "john.doe@example.com") $"Expected email"
   assert ($result.scope == "local") $"Expected local scope"
 
-  mock verify
+  mimic verify
 }
 
 # Test 21: Config with custom name
 export def --env "test ci scm config custom name" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.name' 'John Doe']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.email' 'john@example.com']
     returns: ""
   }
@@ -656,19 +656,19 @@ export def --env "test ci scm config custom name" [] {
   assert ($result.name == "John Doe") $"Expected 'John Doe'"
   assert ($result.email == "john@example.com") $"Expected email"
 
-  mock verify
+  mimic verify
 }
 
 # Test 22: Config with global flag
 export def --env "test ci scm config global" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['config' '--global' 'user.name' 'bot user']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['config' '--global' 'user.email' 'bot_user@ci.example.com']
     returns: ""
   }
@@ -679,31 +679,31 @@ export def --env "test ci scm config global" [] {
   assert ($result.name == "bot user") $"Expected bot user with underscores replaced"
   assert ($result.scope == "global") $"Expected global scope"
 
-  mock verify
+  mimic verify
 }
 
 # Test 23: Config with invalid email
 export def --env "test ci scm config invalid email" [] {
-  mock reset
+  mimic reset
 
   let result = ('notanemail' | ci scm config)
 
   assert ($result.status == "error") $"Expected error status"
   assert ($result.error == "Invalid email format") $"Expected invalid email error"
 
-  mock verify
+  mimic verify
 }
 
 # Test 24: Config with hyphenated email username
 export def --env "test ci scm config hyphenated email" [] {
-  mock reset
+  mimic reset
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.name' 'first middle last']
     returns: ""
   }
 
-  mock register git {
+  mimic register git {
     args: ['config' '--local' 'user.email' 'first-middle-last@company.com']
     returns: ""
   }
@@ -713,5 +713,5 @@ export def --env "test ci scm config hyphenated email" [] {
   assert ($result.status == "success") $"Expected success"
   assert ($result.name == "first middle last") $"Expected hyphens replaced with spaces"
 
-  mock verify
+  mimic verify
 }

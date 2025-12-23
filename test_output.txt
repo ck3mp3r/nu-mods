@@ -1,0 +1,162 @@
+Running tests...
+
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ci/test_log.nu ===
+Found 10 tests
+
+✓ test ci log critical custom icon
+✓ test ci log critical piped
+✓ test ci log debug custom icon
+✓ test ci log debug piped
+✓ test ci log error custom icon
+✓ test ci log error piped
+✓ test ci log info custom icon
+✓ test ci log info piped
+✓ test ci log warning custom icon
+✓ test ci log warning piped
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ci/test_nix.nu ===
+Found 21 tests
+
+✓ test ci nix build and push pipeline
+✓ test ci nix build with args
+✓ test ci nix build with impure
+✓ test ci nix cache check and push
+✓ test ci nix cache check upstream cached
+✓ test ci nix cache check upstream not cached
+✓ test ci nix cache dry-run status
+✓ test ci nix cache push multiple paths
+✓ test ci nix cache push single path
+✓ test ci nix cache skip when upstream cached
+✓ test ci nix check single flake
+✓ test ci nix check with args
+✓ test ci nix check with impure
+✓ test ci nix closure empty input
+✓ test ci nix closure multiple paths
+✓ test ci nix closure single path
+✓ test ci nix flakes all non-flakes
+✓ test ci nix flakes empty input
+✓ test ci nix flakes filters correctly
+✓ test ci nix flakes filters out file paths
+✓ test ci nix flakes mixed everything
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ci/test_github.nu ===
+Found 22 tests
+
+✓ test ci github pr check finds existing pr
+✓ test ci github pr check no existing pr
+✓ test ci github pr create draft
+✓ test ci github pr create new
+✓ test ci github pr info by branch
+✓ test ci github pr info by number
+✓ test ci github pr info current branch
+✓ test ci github pr info not found
+✓ test ci github pr list with filter
+✓ test ci github pr merge auto
+✓ test ci github pr merge failure
+✓ test ci github pr merge squash default
+✓ test ci github pr merge with method
+✓ test ci github summary with list
+✓ test ci github summary with newline flag
+✓ test ci github summary with string
+✓ test ci github workflow cancel
+✓ test ci github workflow list
+✓ test ci github workflow list filter by status
+✓ test ci github workflow logs
+✓ test ci github workflow rerun
+✓ test ci github workflow view
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ci/test_scm.nu ===
+Found 23 tests
+
+✓ test ci scm branch defaults to feature
+✓ test ci scm branch error not git repo
+✓ test ci scm branch feature with ticket prefix
+✓ test ci scm branch fix without ticket
+✓ test ci scm branch hotfix with custom base
+✓ test ci scm branch release with ticket
+✓ test ci scm branch sanitizes description
+✓ test ci scm changes all files
+✓ test ci scm changes custom base
+✓ test ci scm changes no changes
+✓ test ci scm changes staged only
+✓ test ci scm commit failure
+✓ test ci scm commit no changes
+✓ test ci scm commit push failure
+✓ test ci scm commit single file
+✓ test ci scm commit with custom message
+✓ test ci scm commit with files and message
+✓ test ci scm commit with push
+✓ test ci scm config auto derive name
+✓ test ci scm config custom name
+✓ test ci scm config global
+✓ test ci scm config hyphenated email
+✓ test ci scm config invalid email
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ci/test_wrappers.nu ===
+Found 0 tests
+
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ai/test_provider.nu ===
+Found 3 tests
+
+✓ test provider run handles empty response
+✓ test provider run strips thinking tags
+✓ test provider run with valid response
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/ai/test_git.nu ===
+Found 6 tests
+
+Generating branch name...
+Error generating branch name: AI provider error
+✓ test ai git branch from current
+Generating branch name...
+Error generating branch name: AI provider error
+✓ test ai git branch with description and prefix
+Generating commit message...
+Error generating commit message: AI provider error
+✓ test ai git commit extracts branch prefix
+Generating commit message...
+Error generating commit message: AI provider error
+✓ test ai git commit with custom model
+Checking for existing PRs for branch 'feature/test-123' -> 'develop'...
+✓ No existing PR found
+→ Will create new PR
+
+Generating PR title and description...
+Error generating PR: AI provider error
+✓ test ai git pr with custom model and target
+Checking for existing PRs for branch 'feature/add-tests' -> 'main'...
+✓ No existing PR found
+→ Will create new PR
+
+Generating PR title and description...
+Error generating PR: AI provider error
+✓ test ai git pr with prefix
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/nu-mimic/test_registry.nu ===
+Found 0 tests
+
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/nu-mimic/test_proper_usage.nu ===
+Found 3 tests
+
+✓ test complete mock workflow
+✗ test verify detects unmet expectations: External command had a non-zero exit code
+✓ test wrapped function with error
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/nu-mimic/test_matchers.nu ===
+Found 6 tests
+
+✓ test any matcher
+✓ test contains matcher
+✓ test exact matcher
+✓ test matcher apply
+✓ test regex matcher
+✓ test wildcard matcher
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/nu-mimic/test_call_tracking.nu ===
+Found 4 tests
+
+✓ test record and get calls
+✓ test sequential expectations with times
+✗ test verify fails on unmet expectations: External command had a non-zero exit code
+✓ test verify passes when expectations met
+=== Running tests from /Users/christian/Projects/ck3mp3r/nu-mods/tests/nu-mimic/test_integration.nu ===
+Found 4 tests
+
+✓ test any matcher integration
+✓ test mimic git with exact args
+✓ test mimic multiple expectations
+✓ test wildcard integration
+
+Results: 100/102 passed, 2 failed
