@@ -15,7 +15,7 @@ mock register git {
 }
 
 # Define wrapped function
-def --wrapped git [...args] {
+def --env --wrapped git [...args] {
   let expectation = (mock get-expectation 'git' $args)
   $expectation.returns
 }
@@ -43,7 +43,7 @@ mock register git {
   returns: 'changes'
 }
 
-def --wrapped git [...args] {
+def --env --wrapped git [...args] {
   let expectation = (mock get-expectation 'git' $args)
   $expectation.returns
 }

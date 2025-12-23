@@ -14,7 +14,7 @@ export def "mock create-wrapped" [
 
   # Generate the wrapped function code
   $"
-export def --wrapped ($cmd_name) [...args] {
+export def --env --wrapped ($cmd_name) [...args] {
     use ../modules/nu-mock *
     
     let expectation = \(mock get-expectation '($cmd_name)' $args\)

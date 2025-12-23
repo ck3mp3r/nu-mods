@@ -12,7 +12,7 @@ mock register git {
   returns: 'wildcard matched'
 }
 
-def --wrapped git [...args] {
+def --env --wrapped git [...args] {
   let expectation = (mock get-expectation 'git' $args)
   $expectation.returns
 }
@@ -34,7 +34,7 @@ mock register input {
   returns: 'y'
 }
 
-def --wrapped input [...args] {
+def --env --wrapped input [...args] {
   let expectation = (mock get-expectation 'input' $args)
   $expectation.returns
 }
@@ -58,7 +58,7 @@ mock register git {
   returns: 'regex matched'
 }
 
-def --wrapped git [...args] {
+def --env --wrapped git [...args] {
   let expectation = (mock get-expectation 'git' $args)
   $expectation.returns
 }
@@ -81,12 +81,13 @@ mock register git {
   exit_code: 1
 }
 
-def --wrapped git [...args] {
+def --env --wrapped git [...args] {
   let expectation = (mock get-expectation 'git' $args)
   
   let exit_code = ($expectation | get -o exit_code | default 0)
   if $exit_code != 0 {
-    error make {msg: $\"Git error: ($expectation.returns)\"}
+    let msg = $expectation.returns
+    error make {msg: $"Git error: ($msg)"}
   }
   
   $expectation.returns
