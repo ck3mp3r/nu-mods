@@ -221,7 +221,7 @@ export def --env "mimic reset" [] {
 
 # Helper to run test with automatic reset and verify
 # Wraps a test closure to handle boilerplate setup/teardown
-export def --env "with-mimic" [
+export def "with-mimic" [
   test_fn: closure # Test code to run
 ] {
   mimic reset
