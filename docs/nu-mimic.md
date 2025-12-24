@@ -7,22 +7,29 @@ A lightweight, environment-based mocking framework for testing Nushell code.
 ```nushell
 use modules/nu-mimic *
 
-# 1. Setup expectations
-mimic register git {
-  args: ['status']
-  returns: 'clean'
+# Recommended: Use with-mimic helper
+export def --env "test my feature" [] {
+  with-mimic {
+    # 1. Setup expectations
+    mimic register git {
+      args: ['status']
+      returns: 'clean'
+    }
+
+    # 2. Create wrapper using --wrapped
+    def --env --wrapped git [...args] {
+      mimic call 'git' $args
+    }
+
+    # 3. Use naturally
+    let result = (git status)  # Returns 'clean'
+    
+    # 4. Assertions
+    assert equal 'clean' $result
+    
+    # reset and verify happen automatically!
+  }
 }
-
-# 2. Create wrapper using --wrapped
-def --env --wrapped git [...args] {
-  mimic call 'git' $args
-}
-
-# 3. Use naturally
-git status  # Returns 'clean'
-
-# 4. Verify
-mimic verify
 ```
 
 ## Core Concepts
@@ -46,6 +53,39 @@ def --env --wrapped git [...args] { mimic call 'git' $args }
 Without `--wrapped`, your wrapper won't properly shadow the external `git` command.
 
 ## API Reference
+
+### `with-mimic` (Recommended)
+
+**Helper function that handles setup and teardown automatically.**
+
+```nushell
+with-mimic <closure>
+```
+
+Automatically:
+- Calls `mimic reset` at start
+- Calls `mimic verify` at end
+- Propagates errors correctly
+
+**Example:**
+
+```nushell
+export def --env "test my feature" [] {
+  with-mimic {
+    mimic register git { args: ['status'], returns: 'clean' }
+    
+    def --env --wrapped git [...args] { mimic call 'git' $args }
+    
+    let result = (git status)
+    assert equal 'clean' $result
+  }
+}
+```
+
+**Benefits:**
+- Less boilerplate
+- Guarantees verify runs even if test errors
+- Cleaner, more focused test code
 
 ### `mimic register`
 
@@ -198,43 +238,41 @@ mimic register git {
 use modules/nu-mimic *
 
 export def --env "test git workflow" [] {
-  # Setup
-  mimic reset
-  
-  # Register expectations
-  mimic register git {
-    args: ['status']
-    returns: 'clean'
-    times: 2
-  }
-  
-  mimic register git {
-    args: ['push']
-    returns: 'success'
-  }
-  
-  # Create wrapper
-  def --env --wrapped git [...args] {
-    mimic call 'git' $args
-  }
-  
-  # Run code under test
-  def --env my_workflow [] {
-    let s1 = (git status)
-    let s2 = (git status)
-    git push
+  with-mimic {
+    # Register expectations
+    mimic register git {
+      args: ['status']
+      returns: 'clean'
+      times: 2
+    }
     
-    {status1: $s1, status2: $s2}
+    mimic register git {
+      args: ['push']
+      returns: 'success'
+    }
+    
+    # Create wrapper
+    def --env --wrapped git [...args] {
+      mimic call 'git' $args
+    }
+    
+    # Run code under test
+    def --env my_workflow [] {
+      let s1 = (git status)
+      let s2 = (git status)
+      git push
+      
+      {status1: $s1, status2: $s2}
+    }
+    
+    let results = (my_workflow)
+    
+    # Assertions
+    assert ($results.status1 == 'clean')
+    assert ($results.status2 == 'clean')
+    
+    # reset and verify handled by with-mimic!
   }
-  
-  let results = (my_workflow)
-  
-  # Assertions
-  assert ($results.status1 == 'clean')
-  assert ($results.status2 == 'clean')
-  
-  # Verify all expectations met
-  mimic verify
 }
 ```
 
@@ -286,27 +324,41 @@ try {
 
 ## Best Practices
 
-### 1. Always Reset at Test Start
+### 1. Use `with-mimic` Helper (Recommended)
+
+```nushell
+export def --env "test something" [] {
+  with-mimic {
+    # Setup expectations
+    mimic register cmd { args: ['test'], returns: 'ok' }
+    
+    # Test code here
+  }
+}
+```
+
+**Or manually if needed:**
 
 ```nushell
 export def --env "test something" [] {
   mimic reset  # CRITICAL!
-  # ... rest of test
+  # ... test code
+  mimic verify  # CRITICAL!
 }
 ```
 
 ### 2. Create Wrappers Per Test
 
-Don't create global wrappers - create them inside each test function:
+Don't create global wrappers - create them inside each test function (inside `with-mimic` block):
 
 ```nushell
 export def --env "test my feature" [] {
-  mimic reset
-  
-  # Define wrapper HERE
-  def --env --wrapped git [...args] { mimic call 'git' $args }
-  
-  # ... test code
+  with-mimic {
+    # Define wrapper HERE
+    def --env --wrapped git [...args] { mimic call 'git' $args }
+    
+    # ... test code
+  }
 }
 ```
 
@@ -322,18 +374,29 @@ mimic register git { args: ['status', '--short'], returns: 'M file.txt' }
 mimic register git { args: {any: true}, returns: 'whatever' }
 ```
 
-### 4. Verify at the End
+### 4. Verify Expectations
 
-Always call `mimic verify` to ensure all expectations were satisfied:
+`with-mimic` automatically calls `mimic verify` at the end. If using manual approach, always verify:
 
 ```nushell
 export def --env "test something" [] {
+  with-mimic {
+    mimic register some_cmd { args: ['test'], returns: 'ok', times: 2 }
+    
+    # ... test code that should call some_cmd twice
+    
+    # verify happens automatically!
+  }
+}
+
+# Or manual:
+export def --env "test manual" [] {
   mimic reset
   mimic register some_cmd { args: ['test'], returns: 'ok', times: 2 }
   
-  # ... test code that should call some_cmd twice
+  # ... test code
   
-  mimic verify  # Will error if called != 2 times
+  mimic verify  # MUST call explicitly!
 }
 ```
 
@@ -382,10 +445,11 @@ nu run_tests.nu
 
 ## Limitations
 
-1. **No automatic cleanup** - You must call `mimic reset` in each test
+1. **Manual wrappers** - You create your own `--wrapped` functions per test
 2. **Environment-based** - Mimic state is in `$env`, so wrappers must use `--env`
-3. **Manual wrappers** - You create your own `--wrapped` functions per test
-4. **Single process** - Doesn't work across subprocess boundaries (except when intentional)
+3. **Single process** - Doesn't work across subprocess boundaries (except when intentional)
+
+Note: Use `with-mimic` helper to avoid manual reset/verify boilerplate!
 
 ## Contributing
 
