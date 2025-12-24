@@ -45,55 +45,52 @@ export def --env "test complete mock workflow" [] {
 }
 
 # Test: Verify catches missing calls
-# This test MUST use subprocess isolation because it expects verify to fail
 export def "test verify detects unmet expectations" [] {
-  let test_script = "
-use modules/nu-mimic *
+  let result = (
+    try {
+      with-mimic {
+        # Setup expectation for 2 calls
+        mimic register git {
+          args: ['status']
+          returns: 'output'
+          times: 2
+        }
 
-mimic reset
+        # Only make 1 call
+        mimic call 'git' ['status']
+      }
+      null
+    } catch {|err|
+      $err
+    }
+  )
 
-# Setup expectation for 2 calls
-mimic register git {
-  args: ['status']
-  returns: 'output'
-  times: 2
-}
-
-# Only make 1 call
-mimic call 'git' ['status']
-
-# This should fail
-mimic verify
-"
-
-  let result = (do { nu --no-config-file -c $test_script } | complete)
-
-  assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "verification failed")
+  assert ($result != null)
+  assert ($result.msg | str contains "verification failed")
 }
 
 # Test: Wrapped function pattern with exit codes
-# This test MUST use subprocess isolation because it expects mimic call to error
 export def "test wrapped function with error" [] {
-  let test_script = "
-use modules/nu-mimic *
+  let result = (
+    try {
+      with-mimic {
+        mimic register git {
+          args: ['push']
+          returns: 'fatal: remote error'
+          exit_code: 1
+        }
 
-mimic reset
+        # This should error
+        mimic call 'git' ['push']
+      }
+      null
+    } catch {|err|
+      $err
+    }
+  )
 
-mimic register git {
-  args: ['push']
-  returns: 'fatal: remote error'
-  exit_code: 1
-}
-
-# This should error
-mimic call 'git' ['push']
-"
-
-  let result = (do { nu --no-config-file -c $test_script } | complete)
-
-  assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "fatal: remote error")
+  assert ($result != null)
+  assert ($result.msg | str contains "fatal: remote error")
 }
 
 # Test: with-mimic helper - successful test
@@ -112,28 +109,29 @@ export def --env "test with-mimic helper success" [] {
 
 # Test: with-mimic helper - handles test errors and still verifies
 export def "test with-mimic helper verifies on error" [] {
-  let test_script = "
-use modules/nu-mimic *
+  let result = (
+    try {
+      with-mimic {
+        mimic register git {
+          args: ['status']
+          returns: 'output'
+          times: 2
+        }
 
-with-mimic {
-  mimic register git {
-    args: ['status']
-    returns: 'output'
-    times: 2
-  }
-  
-  # Only make 1 call
-  mimic call 'git' ['status']
-  
-  # Don't call verify - with-mimic should do it
-}
-"
+        # Only make 1 call
+        mimic call 'git' ['status']
 
-  let result = (do { nu --no-config-file -c $test_script } | complete)
+        # Don't call verify - with-mimic should do it
+      }
+      null
+    } catch {|err|
+      $err
+    }
+  )
 
   # Should fail because verify detects unmet expectations
-  assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "verification failed")
+  assert ($result != null)
+  assert ($result.msg | str contains "verification failed")
 }
 
 # Test: with-mimic helper - reset happens automatically

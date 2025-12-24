@@ -64,33 +64,29 @@ export def --env "test sequential expectations with times" [] {
 }
 
 # Test: Verify fails when expected calls not made
-# This test MUST run in isolation because it expects verify to fail
 export def "test verify fails on unmet expectations" [] {
-  # Run in subprocess to avoid state pollution
-  let test_script = "
-use modules/nu-mimic *
+  let result = (
+    try {
+      with-mimic {
+        # Expect 2 calls
+        mimic register git {
+          args: ['status']
+          returns: 'output'
+          times: 2
+        }
 
-mimic reset
+        # Only make 1 call
+        let exp = (mimic get-expectation 'git' ['status'])
+        mimic record-call 'git' ['status']
+      }
+      null
+    } catch {|err|
+      $err
+    }
+  )
 
-# Expect 2 calls
-mimic register git {
-  args: ['status']
-  returns: 'output'
-  times: 2
-}
-
-# Only make 1 call
-let exp = (mimic get-expectation 'git' ['status'])
-mimic record-call 'git' ['status']
-
-# Verify should fail
-mimic verify
-"
-
-  let result = (do { nu --no-config-file -c $test_script } | complete)
-
-  assert ($result.exit_code != 0)
-  assert ($result.stderr | str contains "verification failed")
+  assert ($result != null)
+  assert ($result.msg | str contains "verification failed")
 }
 
 # Test: Verify passes when expectations met
