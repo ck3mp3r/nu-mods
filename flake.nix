@@ -8,13 +8,22 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
-    devenv = {
-      url = "github:cachix/devenv";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     topiary-nu = {
       url = "github:ck3mp3r/flakes?dir=topiary-nu";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+    # Nushell 0.109.1 binaries from GitHub releases (avoids 0.110.0 stdlib bugs)
+    nushell-aarch64-darwin = {
+      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-apple-darwin.tar.gz";
+      flake = false;
+    };
+    nushell-aarch64-linux = {
+      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-unknown-linux-gnu.tar.gz";
+      flake = false;
+    };
+    nushell-x86_64-linux = {
+      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-x86_64-unknown-linux-gnu.tar.gz";
+      flake = false;
     };
   };
 
@@ -86,28 +95,46 @@
             dependencies = [self.packages.${system}.common];
           };
 
-          ci =
-            let
-              ciModule = mkNuModule {
-                pname = "ci";
-                src = ./modules/ci;
-                description = "CI/CD SCM flow utilities for Nushell";
-                dependencies = [self.packages.${system}.common];
-                runtimeInputs = [pkgs.cachix];
-              };
-            in
-              pkgs.symlinkJoin {
-                name = "ci";
-                paths = [
-                  ciModule
-                  pkgs.cachix
-                ];
-              };
+          ci = let
+            ciModule = mkNuModule {
+              pname = "ci";
+              src = ./modules/ci;
+              description = "CI/CD SCM flow utilities for Nushell";
+              dependencies = [self.packages.${system}.common];
+              runtimeInputs = [pkgs.cachix];
+            };
+          in
+            pkgs.symlinkJoin {
+              name = "ci";
+              paths = [
+                ciModule
+                pkgs.cachix
+              ];
+            };
 
           nu-mimic = mkNuModule {
             pname = "nu-mimic";
             src = ./modules/nu-mimic;
             description = "Mocking framework for Nushell testing";
+          };
+
+          # Nushell 0.109.1 from GitHub releases (avoids 0.110.0 stdlib bugs)
+          nushell = pkgs.stdenvNoCC.mkDerivation {
+            pname = "nu";
+            version = "0.109.1";
+
+            src =
+              if system == "aarch64-darwin"
+              then inputs.nushell-aarch64-darwin
+              else if system == "aarch64-linux"
+              then inputs.nushell-aarch64-linux
+              else if system == "x86_64-linux"
+              then inputs.nushell-x86_64-linux
+              else throw "Unsupported system: ${system}";
+
+            installPhase = ''
+              install -D -m755 nu $out/bin/nu
+            '';
           };
 
           # Global package that bundles all modules
@@ -159,19 +186,19 @@
         };
 
         devShells = {
-          default = inputs.devenv.lib.mkShell {
-            inherit inputs pkgs;
-            modules = [
-              ./devenv.nix
-            ];
-          };
+          default = let
+            shellConfig = import ./devshell.nix {inherit pkgs;};
+          in
+            pkgs.mkShellNoCC {
+              inherit (shellConfig) packages shellHook;
+            };
 
           # Minimal CI shell with just essentials for running tests
           # mkShellNoCC avoids pulling in compiler toolchain dependencies
           ci = pkgs.mkShellNoCC {
             packages = [
               pkgs.cachix
-              pkgs.nushell
+              self.packages.${system}.nushell # Use pinned nushell to avoid 0.110.0 bugs
             ];
           };
         };
