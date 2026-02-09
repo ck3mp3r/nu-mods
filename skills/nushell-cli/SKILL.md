@@ -35,12 +35,79 @@ def "main list" [] {
 - Spaces in quoted names create subcommands: `"main create"`
 - More spaces = deeper nesting: `"main sub subsub"`
 
-**Usage:**
+**Usage as a module:**
 ```bash
 nu tool.nu              # Calls main, shows help
 nu tool.nu create foo   # Calls "main create"
 nu tool.nu list         # Calls "main list"
 ```
+
+### Using Custom Names
+
+You can use any name instead of "main":
+
+```nu
+# Entry point with custom name
+def mytool [] {
+  help mytool
+}
+
+def "mytool create" [name: string] {
+  mkdir $name
+}
+
+def "mytool list" [] {
+  ls
+}
+```
+
+**Usage:**
+```bash
+nu mytool.nu              # Calls mytool
+nu mytool.nu create foo   # Calls "mytool create"
+```
+
+The name you use in `def name []` becomes your command prefix. "main" is conventional but not required.
+
+### Executable Scripts with Shebang
+
+For standalone executable tools, add a shebang:
+
+```nu
+#!/usr/bin/env nu
+
+# Entry point - executed when script runs
+def main [] {
+  help main
+}
+
+# Subcommands
+def "main create" [name: string] {
+  mkdir $name
+}
+
+def "main delete" [name: string] {
+  rm -r $name
+}
+
+def "main list" [] {
+  ls
+}
+```
+
+**Usage as executable:**
+```bash
+chmod +x mytool.nu
+./mytool.nu              # Executes main directly
+./mytool.nu create foo   # Calls "main create"
+./mytool.nu list         # Calls "main list"
+```
+
+**Key differences with shebang:**
+- Script is directly executable
+- `def main []` is called when script runs without arguments
+- Still need "main" prefix for subcommands
+- Can be installed to PATH and used like any CLI tool
 
 ### Multi-Level Hierarchies
 
