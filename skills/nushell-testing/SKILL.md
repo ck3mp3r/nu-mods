@@ -1,4 +1,7 @@
-# Skill: nushell-testing
+---
+name: nushell-testing
+description: Testing patterns in Nushell using the nu-mimic mocking framework. Use when writing tests, mocking external commands, or verifying Nushell code behavior.
+---
 
 # Nushell Testing Patterns
 

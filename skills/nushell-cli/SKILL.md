@@ -1,4 +1,7 @@
-# Skill: nushell-cli
+---
+name: nushell-cli
+description: Organize Nushell commands into hierarchical CLI tools using def main and quoted subcommand names. Use when building command-line tools, subcommand structures, or module-based CLIs.
+---
 
 # Nushell CLI Subcommand Pattern
 

@@ -1,4 +1,7 @@
-# Skill: nushell-shell
+---
+name: nushell-shell
+description: Use Nushell as a shell including redirection, pipes, environment variables, external commands, and critical differences from bash/zsh. CRITICAL for avoiding bash/zsh syntax mistakes.
+---
 
 # Nushell Shell Patterns
 

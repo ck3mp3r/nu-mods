@@ -1,4 +1,7 @@
-# Skill: nushell-structured-data
+---
+name: nushell-structured-data
+description: Work with structured data in Nushell including records, error handling, validation, and consistent return values. Use when handling data structures, implementing error patterns, or building robust data pipelines.
+---
 
 # Nushell Structured Data Patterns
 
