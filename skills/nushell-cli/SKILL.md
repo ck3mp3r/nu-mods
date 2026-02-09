@@ -426,6 +426,10 @@ main sci sqrt 16            # Returns 4
 - [ ] Consistency: Same prefix for related commands
 - [ ] Namespace stubs: Commands that just show help
 
+## Working Example
+
+A complete working example is available in `examples/calculator/` demonstrating all the patterns covered in this skill. See [examples/README.md](examples/README.md) for usage instructions and testing.
+
 ## Related Skills
 
 - **nushell-usage** - Core Nushell patterns and syntax
