@@ -35,7 +35,31 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       systems = ["aarch64-darwin" "aarch64-linux" "x86_64-linux"];
       perSystem = {system, ...}: let
-        overlays = [inputs.topiary-nu.overlays.default];
+        # Nushell 0.109.1 from GitHub releases (avoids 0.110.0 stdlib bugs)
+        nushell = pkgs.stdenvNoCC.mkDerivation {
+          pname = "nu";
+          version = "0.109.1";
+
+          src =
+            if system == "aarch64-darwin"
+            then inputs.nushell-aarch64-darwin
+            else if system == "aarch64-linux"
+            then inputs.nushell-aarch64-linux
+            else if system == "x86_64-linux"
+            then inputs.nushell-x86_64-linux
+            else throw "Unsupported system: ${system}";
+
+          installPhase = ''
+            install -D -m755 nu $out/bin/nu
+          '';
+        };
+
+        overlays = [
+          inputs.topiary-nu.overlays.default
+          (
+            final: next: {inherit nushell;}
+          )
+        ];
         pkgs = import inputs.nixpkgs {inherit system overlays;};
       in {
         packages = let
@@ -80,6 +104,7 @@
               };
             };
         in {
+          inherit nushell;
           # Common library modules (no dependencies)
           common = mkNuModule {
             pname = "common";
@@ -116,25 +141,6 @@
             pname = "nu-mimic";
             src = ./modules/nu-mimic;
             description = "Mocking framework for Nushell testing";
-          };
-
-          # Nushell 0.109.1 from GitHub releases (avoids 0.110.0 stdlib bugs)
-          nushell = pkgs.stdenvNoCC.mkDerivation {
-            pname = "nu";
-            version = "0.109.1";
-
-            src =
-              if system == "aarch64-darwin"
-              then inputs.nushell-aarch64-darwin
-              else if system == "aarch64-linux"
-              then inputs.nushell-aarch64-linux
-              else if system == "x86_64-linux"
-              then inputs.nushell-x86_64-linux
-              else throw "Unsupported system: ${system}";
-
-            installPhase = ''
-              install -D -m755 nu $out/bin/nu
-            '';
           };
 
           # Global package that bundles all modules
