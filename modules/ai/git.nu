@@ -2,7 +2,7 @@ use ../common/help show-help
 use provider.nu
 
 # Default AI model for git operations
-const DEFAULT_MODEL = "github-copilot/gpt-4.1"
+const DEFAULT_MODEL = "github-copilot/claude-sonnet-4.5"
 
 # AI-powered git commands - show help
 export def "ai git" [] {
