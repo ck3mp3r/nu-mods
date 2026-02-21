@@ -55,10 +55,10 @@
         };
 
         overlays = [
-          inputs.topiary-nu.overlays.default
           (
             final: next: {inherit nushell;}
           )
+          inputs.topiary-nu.overlays.default
         ];
         pkgs = import inputs.nixpkgs {inherit system overlays;};
       in {

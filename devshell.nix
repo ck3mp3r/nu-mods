@@ -7,24 +7,20 @@
       nu -c 'ls **/*.nu | each { |it| nu --ide-check 100 $it.name }'
     '';
     fmt = pkgs.writeShellScriptBin "fmt" ''
-      find . -name '*.nu' -type f -exec topiary format --language nu --configuration ${pkgs.topiary-nu} {} \;
+      find . -name '*.nu' -type f -exec topiary format {} \;
     '';
   };
 in {
   packages = [
     pkgs.nushell
-    pkgs.gh
-    pkgs.topiary
     pkgs.topiary-nu
+    pkgs.gh
     scripts.test
     scripts.check
     scripts.fmt
   ];
 
   shellHook = ''
-    export TOPIARY_CONFIG_FILE="${pkgs.topiary-nu}/languages.ncl"
-    export TOPIARY_LANGUAGE_DIR="${pkgs.topiary-nu}/languages"
-
     echo
     echo "🐚 Nu-Mods Development Environment"
     echo "Helper scripts you can run:"

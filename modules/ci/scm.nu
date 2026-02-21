@@ -241,12 +241,12 @@ export def "ci scm commit" [
 ] {
   # Parse input files
   let files = $in | if ($in | describe | str starts-with "list") {
-    $in
-  } else if ($in | describe) == "string" {
-    [$in]
-  } else {
-    []
-  }
+      $in
+    } else if ($in | describe) == "string" {
+      [$in]
+    } else {
+      []
+    }
 
   # Verify we're in a git repository
   try {
