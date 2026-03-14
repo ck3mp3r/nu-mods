@@ -5,10 +5,15 @@ path: .
 
 windows:
   - name: code
-    flex_direction: column
     panes:
-      - commands:
+      - flex: 2
+        commands:
           - command: nvim
+      - flex: 1
+        commands:
+          - command: ^opencode
+            args:
+              - --port
 
   - name: misc
     panes:

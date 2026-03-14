@@ -19,6 +19,37 @@ def normalize-flakes []: [list<string> -> list<string> string -> list<string> no
   }
 }
 
+# Extract packages from flake show output (supports both v1 and v2 formats)
+# Returns: { <system>: [pkg1, pkg2, ...], ... }
+def extract-packages-from-flake-info []: [record -> record] {
+  let flake_info = $in
+
+  # Check for new format (v2) with inventory structure
+  if ($flake_info != null) and ("inventory" in $flake_info) and ("packages" in $flake_info.inventory) {
+    let packages_output = $flake_info.inventory.packages.output.children
+
+    $packages_output | columns | each {|system|
+      let system_data = $packages_output | get $system
+
+      # Check if this system has children (packages) or is filtered
+      if ("children" in $system_data) {
+        {$system: ($system_data.children | columns)}
+      } else {
+        {}
+      }
+    } | reduce --fold {} {|it acc| $acc | merge $it }
+  } else if ($flake_info != null) and ("packages" in $flake_info) {
+    # Legacy format (v1) - direct packages structure
+    let packages = $flake_info.packages
+
+    $packages | columns | each {|system|
+      {$system: ($packages | get $system | columns)}
+    } | reduce --fold {} {|it acc| $acc | merge $it }
+  } else {
+    {}
+  }
+}
+
 # Detect current Nix system
 def detect-system []: [nothing -> string] {
   try {
@@ -173,23 +204,19 @@ export def "ci nix packages" []: [
         nix flake show $flake --json --no-update-lock-file | from json
       }
 
-      if ($flake_info != null) and ("packages" in $flake_info) {
-        let packages = $flake_info.packages
+      let packages_by_system = $flake_info | extract-packages-from-flake-info
 
-        $packages | columns | each {|system|
-          let system_packages = $packages | get $system
+      $packages_by_system | columns | each {|system|
+        let pkg_names = $packages_by_system | get $system
 
-          $system_packages | columns | each {|pkg_name|
-            {
-              flake: $flake
-              name: $pkg_name
-              system: $system
-            }
+        $pkg_names | each {|pkg_name|
+          {
+            flake: $flake
+            name: $pkg_name
+            system: $system
           }
-        } | flatten
-      } else {
-        []
-      }
+        }
+      } | flatten
     } catch {|err|
       $"Failed to list packages for ($flake): ($err.msg)" | ci log error
       []
@@ -226,17 +253,17 @@ export def "ci nix build" [
           nix flake show $flake --json --no-update-lock-file | from json
         }
 
-        if ($flake_info == null) or ("packages" not-in $flake_info) {
+        let packages_by_system = $flake_info | extract-packages-from-flake-info
+
+        if ($packages_by_system | is-empty) {
           $"No packages found in ($flake)" | ci log warning
           []
         } else {
-          let packages = $flake_info.packages
-
           # Use detected system or fallback to first available system
-          let target_system = if $current_system in ($packages | columns) {
+          let target_system = if $current_system in ($packages_by_system | columns) {
             $current_system
-          } else if $current_system == "unknown" and (($packages | columns | length) > 0) {
-            let first_system = ($packages | columns | first)
+          } else if $current_system == "unknown" and (($packages_by_system | columns | length) > 0) {
+            let first_system = ($packages_by_system | columns | first)
             $"System detection failed, using first available system: ($first_system)" | ci log warning
             $first_system
           } else {
@@ -244,7 +271,7 @@ export def "ci nix build" [
             return []
           }
 
-          let system_packages = ($packages | get $target_system | columns)
+          let system_packages = ($packages_by_system | get $target_system)
 
           $system_packages | each {|pkg|
             $"Building ($pkg) from ($flake)" | ci log info

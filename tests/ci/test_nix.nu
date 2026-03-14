@@ -31,6 +31,130 @@ export def --env "test ci nix check single flake" [] {
 }
 
 # ============================================================================
+# PACKAGES TESTS
+# ============================================================================
+
+# Test 2: List packages with new v2 format
+export def --env "test ci nix packages v2 format" [] {
+  mimic reset
+
+  # Mock nix flake show with new v2 format (inventory structure)
+  mimic register nix {
+    args: ['flake' 'show' '--json' '--no-update-lock-file']
+    returns: (
+      {
+        version: 2
+        inventory: {
+          packages: {
+            doc: "Packages"
+            output: {
+              children: {
+                "x86_64-linux": {
+                  children: {
+                    pkg1: {what: "package"}
+                    pkg2: {what: "package"}
+                  }
+                }
+                "aarch64-darwin": {
+                  children: {
+                    pkg1: {what: "package"}
+                  }
+                }
+                "aarch64-linux": {
+                  filtered: true
+                }
+              }
+            }
+          }
+        }
+      } | to json
+    )
+  }
+
+  let result = (ci nix packages)
+
+  assert (($result | length) == 3) $"Expected 3 packages but got: ($result | length)"
+
+  # Check x86_64-linux packages
+  let x86_pkgs = ($result | where system == "x86_64-linux")
+  assert (($x86_pkgs | length) == 2) $"Expected 2 x86_64-linux packages"
+  assert ("pkg1" in ($x86_pkgs | get name)) $"Expected pkg1 in x86_64-linux"
+  assert ("pkg2" in ($x86_pkgs | get name)) $"Expected pkg2 in x86_64-linux"
+
+  # Check aarch64-darwin packages
+  let darwin_pkgs = ($result | where system == "aarch64-darwin")
+  assert (($darwin_pkgs | length) == 1) $"Expected 1 aarch64-darwin package"
+  assert ($darwin_pkgs.0.name == "pkg1") $"Expected pkg1 in aarch64-darwin"
+
+  # Verify no aarch64-linux packages (filtered)
+  let linux_arm_pkgs = ($result | where system == "aarch64-linux")
+  assert (($linux_arm_pkgs | length) == 0) "Expected 0 aarch64-linux packages (filtered)"
+
+  mimic verify
+}
+
+# Test 3: List packages with legacy v1 format (backward compatibility)
+export def --env "test ci nix packages v1 format legacy" [] {
+  mimic reset
+
+  # Mock nix flake show with old v1 format (direct packages structure)
+  mimic register nix {
+    args: ['flake' 'show' '--json' '--no-update-lock-file']
+    returns: (
+      {
+        packages: {
+          "x86_64-linux": {
+            pkg1: {type: "derivation"}
+            pkg2: {type: "derivation"}
+          }
+          "aarch64-darwin": {
+            pkg1: {type: "derivation"}
+          }
+        }
+      } | to json
+    )
+  }
+
+  let result = (ci nix packages)
+
+  assert (($result | length) == 3) $"Expected 3 packages but got: ($result | length)"
+
+  # Check x86_64-linux packages
+  let x86_pkgs = ($result | where system == "x86_64-linux")
+  assert (($x86_pkgs | length) == 2) $"Expected 2 x86_64-linux packages"
+
+  # Check aarch64-darwin packages
+  let darwin_pkgs = ($result | where system == "aarch64-darwin")
+  assert (($darwin_pkgs | length) == 1) $"Expected 1 aarch64-darwin package"
+
+  mimic verify
+}
+
+# Test 4: List packages with empty flake
+export def --env "test ci nix packages empty flake" [] {
+  mimic reset
+
+  # Mock nix flake show with no packages
+  mimic register nix {
+    args: ['flake' 'show' '--json' '--no-update-lock-file']
+    returns: (
+      {
+        version: 2
+        inventory: {
+          apps: {doc: "Apps" output: {children: {}}}
+        }
+      } | to json
+    )
+  }
+
+  let result = (ci nix packages)
+
+  assert (($result | length) == 0) $"Expected 0 packages for empty flake"
+
+  mimic verify
+}
+
+# ============================================================================
 # CLOSURE TESTS
 # ============================================================================
 
