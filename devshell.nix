@@ -1,7 +1,7 @@
 {pkgs}: let
   scripts = {
     test = pkgs.writeShellScriptBin "test" ''
-      echo 'No tests configured yet. Add test files with #[test] annotations.'
+      nu run_tests.nu
     '';
     check = pkgs.writeShellScriptBin "check" ''
       nu -c 'ls **/*.nu | each { |it| nu --ide-check 100 $it.name }'
@@ -25,7 +25,7 @@ in {
     echo "🐚 Nu-Mods Development Environment"
     echo "Helper scripts you can run:"
     echo ""
-    printf '  %-15s  %s\n' 'test' 'Run Nushell module tests (placeholder)'
+    printf '  %-15s  %s\n' 'test' 'Run Nushell module tests'
     printf '  %-15s  %s\n' 'check' 'Check Nushell syntax for all .nu files'
     printf '  %-15s  %s\n' 'fmt' 'Format Nushell code with topiary'
     echo

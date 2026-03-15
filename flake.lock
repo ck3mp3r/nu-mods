@@ -8,11 +8,11 @@
       },
       "locked": {
         "dir": "base-nixpkgs",
-        "lastModified": 1773486126,
-        "narHash": "sha256-cNW4Uh76I1B6sSbAF9I7twf1zXYLnqdW2OdRKZvbaoA=",
+        "lastModified": 1773572002,
+        "narHash": "sha256-OdUrNa2VT1mHGMxvyz6tvbekevPSkbuEfl7h4PaQias=",
         "owner": "ck3mp3r",
         "repo": "flakes",
-        "rev": "b0117397d96ade1bf842acf31a17a863db67d2ad",
+        "rev": "3d0dba02b45af25af36b0187da398244cbb31382",
         "type": "github"
       },
       "original": {
@@ -30,11 +30,11 @@
       },
       "locked": {
         "dir": "base-nixpkgs",
-        "lastModified": 1772962381,
-        "narHash": "sha256-qRw6S9QUnZuSaRI5JyUqPs9TaGx+loKc3sbizUA/7yQ=",
+        "lastModified": 1773571678,
+        "narHash": "sha256-4hAlA0CJutYCjMStff3tC8oyS6qOLeyeBQPc2vdRA3E=",
         "owner": "ck3mp3r",
         "repo": "flakes",
-        "rev": "ac7b8d1e8e1454de308a5a002176170b4437c94a",
+        "rev": "9ca52e24071e66067428b794e2f5c37e0835be32",
         "type": "github"
       },
       "original": {
@@ -163,45 +163,6 @@
         "type": "github"
       }
     },
-    "nushell-aarch64-darwin": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1764708503,
-        "narHash": "sha256-hlRqzsXqwjFwqbBSerIK8UpXzy5Id/r1WCKA1yICAIg=",
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-apple-darwin.tar.gz"
-      },
-      "original": {
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-apple-darwin.tar.gz"
-      }
-    },
-    "nushell-aarch64-linux": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1764709046,
-        "narHash": "sha256-vU/Q7kZRsrgUf0/bwiRGd8YTVMVHxFLPbKaqJ1F7mcQ=",
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-unknown-linux-gnu.tar.gz"
-      },
-      "original": {
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-unknown-linux-gnu.tar.gz"
-      }
-    },
-    "nushell-x86_64-linux": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1764708227,
-        "narHash": "sha256-vy+AuBSqM8Cny/uSl9Ox6p7yWRpQCW2h0sqxPHH3Q9g=",
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-x86_64-unknown-linux-gnu.tar.gz"
-      },
-      "original": {
-        "type": "tarball",
-        "url": "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-x86_64-unknown-linux-gnu.tar.gz"
-      }
-    },
     "root": {
       "inputs": {
         "base-nixpkgs": "base-nixpkgs",
@@ -210,19 +171,16 @@
           "base-nixpkgs",
           "unstable"
         ],
-        "nushell-aarch64-darwin": "nushell-aarch64-darwin",
-        "nushell-aarch64-linux": "nushell-aarch64-linux",
-        "nushell-x86_64-linux": "nushell-x86_64-linux",
         "topiary-nu": "topiary-nu"
       }
     },
     "stable": {
       "locked": {
-        "lastModified": 1772927965,
-        "narHash": "sha256-EjipLHSIWindCNyQ6PffOUKYBXD94886Q3OnkE0LDOk=",
+        "lastModified": 1773563794,
+        "narHash": "sha256-GzwsJviTdcwiKlSwb3svANFz7dve22F8yRx1LCM72ig=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "8df9724afeef8f8109d0c50f969509a71057b415",
+        "rev": "aeacf73c959e4d418da9abbd7674ee45c875b52d",
         "type": "github"
       },
       "original": {
@@ -234,11 +192,11 @@
     },
     "stable_2": {
       "locked": {
-        "lastModified": 1772927965,
-        "narHash": "sha256-EjipLHSIWindCNyQ6PffOUKYBXD94886Q3OnkE0LDOk=",
+        "lastModified": 1773563794,
+        "narHash": "sha256-GzwsJviTdcwiKlSwb3svANFz7dve22F8yRx1LCM72ig=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "8df9724afeef8f8109d0c50f969509a71057b415",
+        "rev": "aeacf73c959e4d418da9abbd7674ee45c875b52d",
         "type": "github"
       },
       "original": {
@@ -260,11 +218,11 @@
       },
       "locked": {
         "dir": "topiary-nu",
-        "lastModified": 1773486126,
-        "narHash": "sha256-cNW4Uh76I1B6sSbAF9I7twf1zXYLnqdW2OdRKZvbaoA=",
+        "lastModified": 1773572002,
+        "narHash": "sha256-OdUrNa2VT1mHGMxvyz6tvbekevPSkbuEfl7h4PaQias=",
         "owner": "ck3mp3r",
         "repo": "flakes",
-        "rev": "b0117397d96ade1bf842acf31a17a863db67d2ad",
+        "rev": "3d0dba02b45af25af36b0187da398244cbb31382",
         "type": "github"
       },
       "original": {
@@ -308,11 +266,11 @@
     },
     "unstable": {
       "locked": {
-        "lastModified": 1772736753,
-        "narHash": "sha256-au/m3+EuBLoSzWUCb64a/MZq6QUtOV8oC0D9tY2scPQ=",
+        "lastModified": 1773507054,
+        "narHash": "sha256-Q8U5VXgrcxmCxPtCCJCIZkcAX3FCZwGh1GNVIXxMND0=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "917fec990948658ef1ccd07cef2a1ef060786846",
+        "rev": "e80236013dc8b77aa49ca90e7a12d86f5d8d64c9",
         "type": "github"
       },
       "original": {
@@ -324,11 +282,11 @@
     },
     "unstable_2": {
       "locked": {
-        "lastModified": 1772736753,
-        "narHash": "sha256-au/m3+EuBLoSzWUCb64a/MZq6QUtOV8oC0D9tY2scPQ=",
+        "lastModified": 1773507054,
+        "narHash": "sha256-Q8U5VXgrcxmCxPtCCJCIZkcAX3FCZwGh1GNVIXxMND0=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "917fec990948658ef1ccd07cef2a1ef060786846",
+        "rev": "e80236013dc8b77aa49ca90e7a12d86f5d8d64c9",
         "type": "github"
       },
       "original": {

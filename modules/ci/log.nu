@@ -3,7 +3,7 @@
 #
 # Usage: "message" | ci log <level> [--icon "emoji"]
 
-use std log
+use std/log
 
 # Default icons for each log level
 const DEFAULT_ICONS = {

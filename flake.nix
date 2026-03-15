@@ -12,19 +12,6 @@
       url = "github:ck3mp3r/flakes?dir=topiary-nu";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Nushell 0.109.1 binaries from GitHub releases (avoids 0.110.0 stdlib bugs)
-    nushell-aarch64-darwin = {
-      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-apple-darwin.tar.gz";
-      flake = false;
-    };
-    nushell-aarch64-linux = {
-      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-aarch64-unknown-linux-gnu.tar.gz";
-      flake = false;
-    };
-    nushell-x86_64-linux = {
-      url = "https://github.com/nushell/nushell/releases/download/0.109.1/nu-0.109.1-x86_64-unknown-linux-gnu.tar.gz";
-      flake = false;
-    };
   };
 
   outputs = inputs @ {
@@ -35,76 +22,52 @@
     flake-parts.lib.mkFlake {inherit inputs;} {
       systems = ["aarch64-darwin" "aarch64-linux" "x86_64-linux"];
       perSystem = {system, ...}: let
-        # Nushell 0.109.1 from GitHub releases (avoids 0.110.0 stdlib bugs)
-        nushell = pkgs.stdenvNoCC.mkDerivation {
-          pname = "nu";
-          version = "0.109.1";
-
-          src =
-            if system == "aarch64-darwin"
-            then inputs.nushell-aarch64-darwin
-            else if system == "aarch64-linux"
-            then inputs.nushell-aarch64-linux
-            else if system == "x86_64-linux"
-            then inputs.nushell-x86_64-linux
-            else throw "Unsupported system: ${system}";
-
-          installPhase = ''
-            install -D -m755 nu $out/bin/nu
-          '';
-        };
-
         overlays = [
-          (
-            final: next: {inherit nushell;}
-          )
           inputs.topiary-nu.overlays.default
         ];
         pkgs = import inputs.nixpkgs {inherit system overlays;};
-      in {
-        packages = let
-          # Helper function to create individual module packages with dependencies
-          mkNuModule = {
-            pname,
-            src,
-            description,
-            dependencies ? [],
-            runtimeInputs ? [],
-          }:
-            pkgs.stdenvNoCC.mkDerivation {
-              inherit pname src;
-              version = "0.1.0";
+        # Helper function to create individual module packages with dependencies
+        mkNuModule = {
+          pname,
+          src,
+          description,
+          dependencies ? [],
+          runtimeInputs ? [],
+        }:
+          pkgs.stdenvNoCC.mkDerivation {
+            inherit pname src;
+            version = "0.1.0";
 
-              propagatedBuildInputs = runtimeInputs;
+            propagatedBuildInputs = runtimeInputs;
 
-              dontBuild = true;
-              dontConfigure = true;
+            dontBuild = true;
+            dontConfigure = true;
 
-              installPhase = ''
-                runHook preInstall
+            installPhase = ''
+              runHook preInstall
 
-                mkdir -p $out/share/nushell/modules/${pname}
-                cp -r * $out/share/nushell/modules/${pname}/
+              mkdir -p $out/share/nushell/modules/${pname}
+              cp -r * $out/share/nushell/modules/${pname}/
 
-                # Copy dependencies at the same level (as sibling modules)
-                ${pkgs.lib.concatMapStringsSep "\n" (dep: ''
-                    if [ -d "${dep}/share/nushell/modules" ]; then
-                      cp -rn "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
-                    fi
-                  '')
-                  dependencies}
+              # Copy dependencies at the same level (as sibling modules)
+              ${pkgs.lib.concatMapStringsSep "\n" (dep: ''
+                  if [ -d "${dep}/share/nushell/modules" ]; then
+                    cp -rn "${dep}"/share/nushell/modules/* $out/share/nushell/modules/
+                  fi
+                '')
+                dependencies}
 
-                runHook postInstall
-              '';
+              runHook postInstall
+            '';
 
-              meta = with pkgs.lib; {
-                inherit description;
-                license = licenses.mit;
-                platforms = platforms.all;
-              };
+            meta = with pkgs.lib; {
+              inherit description;
+              license = licenses.mit;
+              platforms = platforms.all;
             };
-        in {
-          inherit nushell;
+          };
+      in {
+        packages = {
           # Common library modules (no dependencies)
           common = mkNuModule {
             pname = "common";
@@ -204,7 +167,7 @@
           ci = pkgs.mkShellNoCC {
             packages = [
               pkgs.cachix
-              self.packages.${system}.nushell # Use pinned nushell to avoid 0.110.0 bugs
+              pkgs.nushell
             ];
           };
         };
