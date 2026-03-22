@@ -68,6 +68,9 @@
           };
       in {
         packages = {
+          # Re-export nushell from nixpkgs
+          nushell = pkgs.nushell;
+
           # Common library modules (no dependencies)
           common = mkNuModule {
             pname = "common";
@@ -182,6 +185,7 @@
           nu-mods-ai = self.packages.${prev.system}.ai;
           nu-mods-ci = self.packages.${prev.system}.ci;
           nu-mods-nu-mimic = self.packages.${prev.system}.nu-mimic;
+          nushell = self.packages.${prev.system}.nushell;
         };
       };
     };
