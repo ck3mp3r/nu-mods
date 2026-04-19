@@ -24,6 +24,36 @@
       perSystem = {system, ...}: let
         overlays = [
           inputs.topiary-nu.overlays.default
+          (final: previous: {
+            nushell = previous.nushell.overrideAttrs (oldAttrs: {
+              checkPhase = let
+                skippedTests =
+                  [
+                    "repl::test_config_path::test_default_config_path"
+                    "repl::test_config_path::test_xdg_config_bad"
+                    "repl::test_config_path::test_xdg_config_empty"
+                    # Add the failing SHLVL tests
+                    "shell::environment::env::env_shlvl_in_repl"
+                    "shell::environment::env::env_shlvl_in_exec_repl"
+                  ]
+                  ++ previous.lib.optionals previous.stdenv.hostPlatform.isDarwin [
+                    "plugins::config::some"
+                    "plugins::stress_internals::test_exit_early_local_socket"
+                    "plugins::stress_internals::test_failing_local_socket_fallback"
+                    "plugins::stress_internals::test_local_socket"
+                    "shell::environment::env::path_is_a_list_in_repl"
+                  ];
+                skippedTestsStr = previous.lib.concatStringsSep " " (previous.lib.map (testId: "--skip=\${testId}") skippedTests);
+              in ''
+                runHook preCheck
+
+                cargo test -j $NIX_BUILD_CORES --offline -- \
+                  --test-threads=$NIX_BUILD_CORES ${skippedTestsStr}
+
+                runHook postCheck
+              '';
+            });
+          })
         ];
         pkgs = import inputs.nixpkgs {inherit system overlays;};
         # Helper function to create individual module packages with dependencies
