@@ -25,11 +25,11 @@ use modules/ci/github.nu *
 
       # Verify file was created and contains content
       assert ($test_file | path exists) "Summary file should exist"
-      let content = (open $test_file)
+      let content = (open --raw $test_file)
       assert ($content | str contains "# Test Summary") $"Expected summary content but got: ($content)"
     } catch {|e|
       if ($test_file | path exists) { rm $test_file }
-      error make {msg: $e.msg}
+      error make $e
     }
 
     # Clean up
@@ -51,13 +51,13 @@ use modules/ci/github.nu *
       nu -c $test_script
 
       # Verify file contains all list items
-      let content = (open $test_file)
+      let content = (open --raw $test_file)
       assert ($content | str contains "## Results") $"Expected results header but got: ($content)"
       assert ($content | str contains "- Item 1") $"Expected item 1 but got: ($content)"
       assert ($content | str contains "- Item 2") $"Expected item 2 but got: ($content)"
     } catch {|e|
       if ($test_file | path exists) { rm $test_file }
-      error make {msg: $e.msg}
+      error make $e
     }
 
     # Clean up
@@ -79,12 +79,12 @@ use modules/ci/github.nu *
       nu -c $test_script
 
       # Verify newlines are present
-      let content = (open $test_file)
+      let content = (open --raw $test_file)
       assert ($content | str contains "Line 1\n") $"Expected newline after Line 1 but got: ($content)"
       assert ($content | str contains "Line 2\n") $"Expected newline after Line 2 but got: ($content)"
     } catch {|e|
       if ($test_file | path exists) { rm $test_file }
-      error make {msg: $e.msg}
+      error make $e
     }
 
     # Clean up
