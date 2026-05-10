@@ -1,4 +1,4 @@
-# Test provider.nu with mocked opencode
+# Test provider.nu with mocked agent
 
 use std/assert
 use ../../modules/nu-mimic *
@@ -9,9 +9,9 @@ use ../../modules/ai/provider.nu *
 export def --env "test provider run with valid response" [] {
   mimic reset
 
-  mimic register opencode {
-    args: ['run' '--model' 'test-model' 'test prompt']
-    returns: "AI response"
+  mimic register agent {
+    args: ['test prompt' '--model' 'test-model']
+    returns: {response: "AI response"}
     exit_code: 0
   }
 
@@ -25,9 +25,9 @@ export def --env "test provider run with valid response" [] {
 export def --env "test provider run strips thinking tags" [] {
   mimic reset
 
-  mimic register opencode {
-    args: ['run' '--model' 'gpt-4' 'analyze this code and provide recommendations']
-    returns: "<think>reasoning</think>final answer"
+  mimic register agent {
+    args: ['analyze this code and provide recommendations' '--model' 'gpt-4']
+    returns: {response: "<think>reasoning</think>final answer"}
     exit_code: 0
   }
 
@@ -41,9 +41,9 @@ export def --env "test provider run strips thinking tags" [] {
 export def --env "test provider run handles empty response" [] {
   mimic reset
 
-  mimic register opencode {
-    args: ['run' '--model' 'gpt-4' 'generate a commit message for this change']
-    returns: ""
+  mimic register agent {
+    args: ['generate a commit message for this change' '--model' 'gpt-4']
+    returns: {response: ""}
     exit_code: 0
   }
 

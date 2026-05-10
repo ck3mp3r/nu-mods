@@ -24,7 +24,8 @@ export def --env --wrapped gh [...args] {
   mimic call 'gh' $args
 }
 
-# Wrapped opencode command
-export def --env --wrapped opencode [...args] {
-  mimic call 'opencode' $args
+# Wrapped agent command - captures piped input via $in
+export def --env --wrapped agent [...args] {
+  let input = $in
+  mimic call 'agent' ($args | prepend $input)
 }
