@@ -1,13 +1,6 @@
 # AI provider abstraction layer
 # This module provides a simple interface to interact with AI providers
 # 
-# NOTE: OpenCode has a bug where using --session with non-existent sessions causes hanging.
-# Additionally, using OpenCode without --session creates a new session for every call,
-# polluting the session list. There's currently no stateless mode in OpenCode.
-#
-# TODO: Consider switching to a different provider (e.g., direct API calls to Anthropic/OpenAI)
-# or wait for OpenCode to add a stateless mode.
-
 # Run an AI prompt and return the response
 # 
 # # Arguments
@@ -20,10 +13,8 @@ export def run [
   prompt: string
   model: string
 ]: nothing -> string {
-  # WARNING: This creates a new session for every call, polluting the session list.
-  # This is a known issue with OpenCode - see comments above.
   let result = try {
-    opencode run --model $model $prompt
+    $prompt | agent --model $model | get response
   } catch {|err|
     error make {
       msg: "AI provider error"
