@@ -1,6 +1,6 @@
 # Tests for matcher system
 
-use std assert
+use std/assert
 use ../../modules/nu-mimic/matchers.nu *
 
 # Test: Wildcard matcher with _

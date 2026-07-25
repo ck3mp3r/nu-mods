@@ -3,7 +3,7 @@
 # 2. Run code under test (using wrapped functions)
 # 3. Verify expectations met
 
-use std assert
+use std/assert
 use ../../modules/nu-mimic *
 
 # Test: Complete workflow - setup, run, verify

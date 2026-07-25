@@ -15,6 +15,7 @@ in {
     pkgs.nushell
     pkgs.topiary-nu
     pkgs.gh
+    pkgs.prek
     scripts.test
     scripts.check
     scripts.fmt
@@ -28,6 +29,7 @@ in {
     printf '  %-15s  %s\n' 'test' 'Run Nushell module tests'
     printf '  %-15s  %s\n' 'check' 'Check Nushell syntax for all .nu files'
     printf '  %-15s  %s\n' 'fmt' 'Format Nushell code with topiary'
+    printf '  %-15s  %s\n' 'prek install' 'Install pre-push git hooks'
     echo
     echo "To use modules locally, run: install-local"
     echo

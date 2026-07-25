@@ -1,5 +1,5 @@
 # Tests for mock registry - expectation registration and retrieval
-use std assert
+use std/assert
 
 # Test: Can register a basic mock expectation
 export def test_register_basic_expectation [] {
