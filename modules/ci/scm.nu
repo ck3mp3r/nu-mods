@@ -106,7 +106,7 @@ export def "ci scm branch" [
   # Sanitize description: lowercase, replace spaces with hyphens, remove special chars
   let clean_desc = (
     $description
-    | str downcase
+    | str lowercase
     | str replace --all ' ' '-'
     | str replace --all --regex '[^a-z0-9\-\.]' ''
   )

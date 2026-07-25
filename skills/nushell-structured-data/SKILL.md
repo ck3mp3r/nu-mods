@@ -552,7 +552,7 @@ export def "git create-branch" [
   # Build branch name
   let clean_desc = (
     $description
-    | str downcase
+    | str lowercase
     | str replace --all ' ' '-'
     | str replace --all --regex '[^a-z0-9\-]' ''
   )
