@@ -1,7 +1,7 @@
 # Integration tests: nu-mimic registry and matcher integration
 # Tests that the full system works together
 
-use std assert
+use std/assert
 use ../../modules/nu-mimic *
 
 # Test: Mock git command with exact match

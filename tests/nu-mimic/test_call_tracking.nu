@@ -1,6 +1,6 @@
 # Tests for call tracking and verification
 
-use std assert
+use std/assert
 use ../../modules/nu-mimic *
 
 # Test: Record calls and retrieve them

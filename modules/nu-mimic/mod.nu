@@ -80,7 +80,7 @@ export def --env "mimic get-expectation" [
 
   # Find first matching expectation and mark as consumed if needed
   mut found_idx = -1
-  mut found_exp = null
+  mut found_exp: any = null
 
   for exp in ($expectations | enumerate) {
     let idx = $exp.index

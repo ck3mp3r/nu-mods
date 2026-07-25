@@ -145,7 +145,8 @@ export def "ci scm branch" [
     git rev-parse --verify $branch_name | complete | get exit_code
   } catch {|err|
     $"Branch ($branch_name) does not exist: ($err.msg)" | ci log info
-    128 # Branch doesn't exist
+    # Branch doesn't exist
+    128
   }
 
   if $branch_exists == 0 {
