@@ -1,0 +1,37 @@
+# prek configuration — git hook manager (pre-commit compatible)
+# Docs: https://prek.j178.dev/
+#
+# Install git shims (run once per clone):
+#   prek install -t pre-push
+#
+# Run manually:
+#   prek run --stage pre-push
+#   prek run --all-files
+#
+# The default_install_hook_types below makes `prek install` (without -t)
+# install the pre-push shim.
+
+default_install_hook_types = ["pre-push"]
+
+# Hooks that run on `git push` to guard the remote against broken
+# Nushell syntax or failing module tests.
+[[repos]]
+repo = "local"
+
+  [[repos.hooks]]
+  id = "nu-check"
+  name = "nushell syntax check"
+  language = "system"
+  entry = "nu --ide-check 100"
+  pass_filenames = true
+  files = "\\.nu$"
+  stages = ["pre-push"]
+
+  [[repos.hooks]]
+  id = "nu-tests"
+  name = "nushell module tests"
+  language = "system"
+  entry = "nu run_tests.nu"
+  pass_filenames = false
+  always_run = true
+  stages = ["pre-push"]

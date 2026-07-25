@@ -164,6 +164,30 @@ test     # Run tests
 fmt      # Format code (placeholder)
 ```
 
+### Pre-push Hooks (prek)
+
+[prek](https://prek.j178.dev/) runs two local hooks before `git push` reaches the remote:
+
+- `nu-check` — `nu --ide-check 100` on every changed `.nu` file (syntax guard)
+- `nu-tests` — `nu run_tests.nu` over the full test suite (regression guard)
+
+Both are declared in [`prek.toml`](./prek.toml) with `default_install_hook_types = ["pre-push"]`, so the git shim is installed once per clone:
+
+```bash
+nix develop       # provides prek on PATH
+prek install      # writes .git/hooks/pre-push shim
+```
+
+Run the same checks on demand:
+
+```bash
+prek run --stage pre-push        # only the pre-push hooks
+prek run --all-files             # every hook against all tracked files
+prek run nu-check --all-files    # a single hook
+```
+
+To bypass the hooks for a single push, use `git push --no-verify`. Remove the shims with `prek uninstall`.
+
 ### Testing
 
 Tests use Nushell's testing framework with `--no-config-file` and mocked external commands:
