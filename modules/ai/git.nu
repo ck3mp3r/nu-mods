@@ -79,7 +79,7 @@ def git-branch [
   print "Generating branch name..."
 
   let branch_name = try {
-    provider run $prompt $model
+    provider execute $prompt $model
   } catch {|err|
     print $"Error generating branch name: ($err.msg)"
     return
@@ -176,7 +176,7 @@ def git-pr [
   print "Generating PR title and description..."
 
   let generated_clean = try {
-    provider run $pr_content $model
+    provider execute $pr_content $model
   } catch {|err|
     print $"Error generating PR: ($err.msg)"
     return
@@ -239,7 +239,7 @@ def git-commit [
   print "Generating commit message..."
 
   mut message = try {
-    provider run $prompt $model
+    provider execute $prompt $model
   } catch {|err|
     print $"Error generating commit message: ($err.msg)"
     return

@@ -9,7 +9,7 @@
 #
 # # Returns
 # The AI response as a string, or an error if the call failed
-export def run [
+export def execute [
   prompt: string
   model: string
 ]: nothing -> string {

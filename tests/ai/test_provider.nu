@@ -15,7 +15,7 @@ export def --env "test provider run with valid response" [] {
     exit_code: 0
   }
 
-  let result = (provider run "test prompt" "test-model")
+  let result = (provider execute "test prompt" "test-model")
   assert equal $result "AI response"
 
   mimic verify
@@ -31,7 +31,7 @@ export def --env "test provider run strips thinking tags" [] {
     exit_code: 0
   }
 
-  let result = (provider run "analyze this code and provide recommendations" "gpt-4")
+  let result = (provider execute "analyze this code and provide recommendations" "gpt-4")
   assert equal $result "final answer"
 
   mimic verify
@@ -48,7 +48,7 @@ export def --env "test provider run handles empty response" [] {
   }
 
   let result = try {
-    provider run "generate a commit message for this change" "gpt-4"
+    provider execute "generate a commit message for this change" "gpt-4"
   } catch {|e|
     $e.msg
   }
