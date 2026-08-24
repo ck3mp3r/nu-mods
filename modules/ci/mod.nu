@@ -27,3 +27,6 @@ export use ./nix.nu *
 
 # Re-export all log commands from log.nu
 export use ./log.nu *
+
+# Re-export all cargo commands from cargo.nu
+export use ./cargo.nu *
