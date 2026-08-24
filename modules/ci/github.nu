@@ -584,6 +584,9 @@ export def "ci github release" [] {
 # Create a GitHub release with auto-generated changelog
 export def "ci github release create" [
   version: string # Release version (e.g., "0.1.0" -> tag "v0.1.0")
+  --prerelease (-p) # Mark as a pre-release and append a suffix to the tag
+  --target: string # Target branch or commit SHA for the tag
+  --suffix: string # Custom suffix for pre-release tags (default: short SHA of HEAD)
 ]: [
   nothing -> record
 ] {
@@ -597,8 +600,25 @@ export def "ci github release create" [
     return {status: "error" error: $"Failed to get git tags: ($err.msg)" version: $version url: null}
   }
 
-  # Find previous tag: first tag that is not v$version
-  let release_tag = $"v($version)"
+  # Determine the release tag. For pre-releases, append a suffix (short SHA of HEAD by default).
+  let base_tag = $"v($version)"
+  let release_tag = if $prerelease {
+    let suffix = if ($suffix | is-not-empty) {
+      $suffix
+    } else {
+      try {
+        git rev-parse --short HEAD | str trim
+      } catch {|err|
+        $"Failed to get short SHA for pre-release: ($err.msg)" | ci log error
+        return {status: "error" error: $"Failed to get short SHA for pre-release: ($err.msg)" version: $version url: null}
+      }
+    }
+    $"($base_tag)-($suffix)"
+  } else {
+    $base_tag
+  }
+
+  # Find previous tag: first tag that is not the release tag
   let other_tags = ($tags | where {|t| $t != $release_tag })
   let previous_tag = if ($other_tags | is-empty) { "" } else { $other_tags | first }
 
@@ -616,7 +636,18 @@ export def "ci github release create" [
 
   $"Creating GitHub release: ($release_tag)" | ci log info
   try {
-    let url = (gh release create $release_tag --title $"Release ($release_tag)" --notes $changelog)
+    # Build gh release create args
+    mut gh_args = ['release' 'create' $release_tag '--title' $"Release ($release_tag)" '--notes' $changelog]
+
+    if $prerelease {
+      $gh_args = ($gh_args | append '--prerelease')
+    }
+
+    if ($target | is-not-empty) {
+      $gh_args = ($gh_args | append ['--target' $target])
+    }
+
+    let url = (gh ...$gh_args)
     {status: "success" error: null version: $version url: $url}
   } catch {|err|
     $"Failed to create release: ($err.msg)" | ci log error

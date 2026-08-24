@@ -105,7 +105,12 @@ GitHub operations.
 - `ci github pr update` - Update existing PR (title/body)
 - `ci github pr merge` - Merge a pull request
 - `ci github release create` - Create a GitHub release with auto-generated changelog
+  - Flags: `--prerelease (-p)`, `--target`, `--suffix`
+  - `--prerelease` marks the release as a pre-release and appends a suffix to the tag (`v0.1.0-<sha>`)
+  - `--suffix` overrides the default short-SHA suffix for pre-release tags (e.g. `--suffix nightly`)
+  - `--target` targets a branch or commit SHA for the tag (works with or without `--prerelease`)
   - Usage: `ci github release create "0.1.0"`
+  - Usage: `ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"`
 - `ci github release upload` - Upload artifacts to a release via stdin
   - Usage: `["file1.tgz" "file2.tgz"] | ci github release upload "0.1.0"`
 - `ci github workflow list` - List workflow runs
@@ -203,6 +208,7 @@ ci github pr update 42 --title "New title"
 
 # GitHub release operations
 ci github release create "0.1.0"
+ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"
 ["file1.tgz" "file2.tgz"] | ci github release upload "0.1.0"
 
 # GitHub workflow operations

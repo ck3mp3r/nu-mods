@@ -610,3 +610,143 @@ export def --env "test ci github release upload failure" [] {
 
   mimic verify
 }
+
+# Test: prerelease with default short-SHA suffix
+export def --env "test ci github release create prerelease short sha" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.0.5"
+  }
+
+  mimic register git {
+    args: ['rev-parse' '--short' 'HEAD']
+    returns: "abc1234"
+  }
+
+  mimic register git {
+    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    returns: "- feat: add feature"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0-abc1234' '--title' 'Release v0.1.0-abc1234' '--notes' '- feat: add feature' '--prerelease' '--target' 'release/0.1.0']
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0-abc1234"
+  }
+
+  let result = (ci github release create "0.1.0" --prerelease --target "release/0.1.0")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.version == "0.1.0") $"Expected version"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0-abc1234") $"Expected url"
+
+  mimic verify
+}
+
+# Test: prerelease with custom suffix
+export def --env "test ci github release create prerelease custom suffix" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.0.5"
+  }
+
+  mimic register git {
+    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    returns: "- feat: add feature"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0-nightly' '--title' 'Release v0.1.0-nightly' '--notes' '- feat: add feature' '--prerelease' '--target' 'release/0.1.0']
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0-nightly"
+  }
+
+  let result = (ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.version == "0.1.0") $"Expected version"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0-nightly") $"Expected url"
+
+  mimic verify
+}
+
+# Test: prerelease failure on git rev-parse
+export def --env "test ci github release create prerelease git failure" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.0.5"
+  }
+
+  mimic register git {
+    args: ['rev-parse' '--short' 'HEAD']
+    returns: "fatal: not a git repository"
+    exit_code: 128
+  }
+
+  let result = (ci github release create "0.1.0" --prerelease)
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.version == "0.1.0") $"Expected version"
+  assert ($result.url == null) $"Expected null url"
+
+  mimic verify
+}
+
+# Test: non-prerelease ignores suffix
+export def --env "test ci github release create ignores suffix" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.0.5"
+  }
+
+  mimic register git {
+    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    returns: "- feat: add feature"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0' '--title' 'Release v0.1.0' '--notes' '- feat: add feature']
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0"
+  }
+
+  let result = (ci github release create "0.1.0" --suffix "custom")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0") $"Expected url without suffix"
+
+  mimic verify
+}
+
+# Test: target without prerelease
+export def --env "test ci github release create target no prerelease" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.0.5"
+  }
+
+  mimic register git {
+    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    returns: "- feat: add feature"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0' '--title' 'Release v0.1.0' '--notes' '- feat: add feature' '--target' 'develop']
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0"
+  }
+
+  let result = (ci github release create "0.1.0" --target "develop")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0") $"Expected url"
+
+  mimic verify
+}
+
