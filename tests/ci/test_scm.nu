@@ -715,3 +715,78 @@ export def --env "test ci scm config hyphenated email" [] {
 
   mimic verify
 }
+
+# ============================================================================
+# LATEST-TAG TESTS
+# ============================================================================
+
+# Test 25: latest-tag returns newest tag without v prefix
+export def --env "test ci scm latest-tag returns newest" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v1.2.3\nv1.0.0\nv0.9.0"
+  }
+
+  let result = (ci scm latest-tag)
+
+  assert ($result == "1.2.3") $"Expected '1.2.3' but got: ($result)"
+
+  mimic verify
+}
+
+# Test 26: latest-tag returns empty string when no tags
+export def --env "test ci scm latest-tag no tags" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: ""
+  }
+
+  let result = (ci scm latest-tag)
+
+  assert ($result == "") $"Expected empty string but got: ($result)"
+
+  mimic verify
+}
+
+# ============================================================================
+# SEMVER TESTS
+# ============================================================================
+
+# Test 27: semver with empty tag returns current version
+export def --env "test ci scm semver empty tag" [] {
+  let result = (ci scm semver "" "1.2.3")
+
+  assert ($result == "1.2.3") $"Expected '1.2.3' but got: ($result)"
+}
+
+# Test 28: semver same version increments patch
+export def --env "test ci scm semver patch increment" [] {
+  let result = (ci scm semver "1.0.0" "1.0.0")
+
+  assert ($result == "1.0.1") $"Expected '1.0.1' but got: ($result)"
+}
+
+# Test 29: semver major change returns current
+export def --env "test ci scm semver major change" [] {
+  let result = (ci scm semver "1.0.5" "2.0.0")
+
+  assert ($result == "2.0.0") $"Expected '2.0.0' but got: ($result)"
+}
+
+# Test 30: semver minor change returns current
+export def --env "test ci scm semver minor change" [] {
+  let result = (ci scm semver "1.0.5" "1.1.0")
+
+  assert ($result == "1.1.0") $"Expected '1.1.0' but got: ($result)"
+}
+
+# Test 31: semver patch ahead of tag returns current
+export def --env "test ci scm semver patch ahead" [] {
+  let result = (ci scm semver "1.0.0" "1.0.3")
+
+  assert ($result == "1.0.3") $"Expected '1.0.3' but got: ($result)"
+}

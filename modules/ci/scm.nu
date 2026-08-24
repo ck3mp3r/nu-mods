@@ -63,6 +63,77 @@ export def "ci scm config" [
   {status: "success" error: null name: $user_name email: $email scope: $scope}
 }
 
+# Get the latest git tag, stripping the 'v' prefix
+export def "ci scm latest-tag" []: [
+  nothing -> string
+] {
+  # Get all tags sorted by semantic version, take the newest
+  let tags = (
+    try {
+      git tag --sort=-version:refname
+    } catch {|err|
+      "Failed to get git tags" | ci log error
+      return ""
+    }
+    | lines
+  )
+
+  if ($tags | is-empty) {
+    "No tags found" | ci log info
+    return ""
+  }
+
+  # Take the first tag (newest) and strip the 'v' prefix if present
+  let latest = ($tags | first | str trim)
+  $"Latest tag: ($latest)" | ci log info
+
+  if ($latest | str starts-with "v") {
+    $latest | str replace --regex '^v' ''
+  } else {
+    $latest
+  }
+}
+
+# Calculate the next semantic version
+export def "ci scm semver" [
+  latest_tag: string # Latest git tag (X.Y.Z format, may be empty)
+  current_version: string # Current version from Cargo.toml (X.Y.Z format)
+]: [
+  nothing -> string
+] {
+  if $latest_tag == "" {
+    "No tag, keeping current version" | ci log info
+    return $current_version
+  }
+
+  let tag_parts = ($latest_tag | split row "." | each {|p| $p | into int })
+  let current_parts = ($current_version | split row "." | each {|p| $p | into int })
+
+  let tag_major = $tag_parts.0
+  let tag_minor = $tag_parts.1
+  let tag_patch = $tag_parts.2
+
+  let cur_major = $current_parts.0
+  let cur_minor = $current_parts.1
+  let cur_patch = $current_parts.2
+
+  # If major or minor differ, current version is ahead -> keep it
+  if ($tag_major != $cur_major) or ($tag_minor != $cur_minor) {
+    "Major/minor differ, keeping current version" | ci log info
+    return $current_version
+  }
+
+  # Same major/minor: if patch is behind or equal, increment patch
+  if ($cur_patch > $tag_patch) {
+    "Patch ahead of tag, keeping current version" | ci log info
+    return $current_version
+  }
+
+  let next_patch = ($tag_patch + 1)
+  $"Incrementing patch to ($cur_major).($cur_minor).($next_patch)" | ci log info
+  $"($cur_major).($cur_minor).($next_patch)"
+}
+
 # Create a new git branch with standardized naming convention based on SCM flow types
 export def "ci scm branch" [
   --prefix (-p): string # Optional prefix for branch name (e.g., "myproject" -> "myproject/feature/...")
