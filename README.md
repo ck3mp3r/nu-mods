@@ -90,10 +90,14 @@ SCM workflow operations.
   - Usage: `ci scm semver "1.0.0" "1.0.0"` (returns `1.0.1`)
   - Usage: `ci scm semver "1.0.0-abc1234" "1.0.0"` (returns `1.0.1`)
 - `ci scm merge` - Merge a source branch into a target branch. Squash is the DEFAULT merge strategy.
-  - Flags: `--message (-m)`, `--no-squash`, `--delete-remote`, `--target` (default `main`), `--push`
+  - Flags: `--message (-m)`, `--no-squash`, `--target` (default `main`), `--push`
   - `--message` is required with the default squash merge; `--no-squash` uses a regular merge (auto-commits, no message needed)
   - Guards against empty commits when the squash merge produces no staged changes
-  - Usage: `ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote`
+  - Usage: `ci scm merge "release/0.1.0" -m "Release 0.1.0" --push`
+- `ci scm cleanup` - Delete a remote and/or local branch
+  - Flags: `--remote` (git push origin --delete), `--local` (git branch -D)
+  - At least one of `--remote` or `--local` is required
+  - Usage: `ci scm cleanup "release/0.1.0" --remote --local`
 - `ci scm config` - Configure git user name and email
 - `ci scm changes` - Get list of changed files since branch was created
 
@@ -203,10 +207,11 @@ ci scm branch "v2.1.0" --release --from develop
 "SEC-999" | ci scm branch "patch vulnerability" --hotfix --from production
 ci scm branch "update dependencies" --chore --no-checkout
 
-# SCM version and merge
+# SCM version, merge, and cleanup
 ci scm latest-tag
 ci scm semver "1.0.0" "1.0.0"
-ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote
+ci scm merge "release/0.1.0" -m "Release 0.1.0" --push
+ci scm cleanup "release/0.1.0" --remote --local
 
 # GitHub PR operations
 ci github pr check --target main

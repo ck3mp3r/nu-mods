@@ -824,7 +824,7 @@ export def --env "test ci scm semver suffix major change" [] {
 # MERGE TESTS
 # ============================================================================
 
-# Test 32: squash merge (default) with changes commits, pushes, deletes
+# Test 32: squash merge (default) with changes commits, pushes
 export def --env "test ci scm merge squash with changes" [] {
   mimic reset
 
@@ -834,19 +834,17 @@ export def --env "test ci scm merge squash with changes" [] {
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
   mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
   mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
-  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
 
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote)
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
   assert ($result.status == "success") "Expected success but got: ($result.status)"
   assert ($result.committed == true) "Expected committed to be true"
   assert ($result.pushed == true) "Expected pushed to be true"
-  assert ($result.branch_deleted == true) "Expected branch_deleted to be true"
 
   mimic verify
 }
 
-# Test 33: squash merge with no changes skips commit, push, delete
+# Test 33: squash merge with no changes skips commit, push
 export def --env "test ci scm merge squash no changes" [] {
   mimic reset
 
@@ -855,12 +853,11 @@ export def --env "test ci scm merge squash no changes" [] {
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 0 }
 
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote)
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
   assert ($result.status == "success") "Expected success but got: ($result.status)"
   assert ($result.committed == false) "Expected committed to be false"
   assert ($result.pushed == false) "Expected pushed to be false"
-  assert ($result.branch_deleted == false) "Expected branch_deleted to be false"
 
   mimic verify
 }
@@ -982,7 +979,6 @@ export def --env "test ci scm merge no squash" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.committed == true) $"Expected committed to be true"
   assert ($result.pushed == true) $"Expected pushed to be true"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
 
   mimic verify
 }
@@ -1012,13 +1008,12 @@ export def --env "test ci scm merge no-squash no message" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.committed == true) $"Expected committed to be true"
   assert ($result.pushed == false) $"Expected pushed to be false"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
 
   mimic verify
 }
 
-# Test 37: without --push and --delete-remote skips both
-export def --env "test ci scm merge no push no delete" [] {
+# Test 37: without --push skips push
+export def --env "test ci scm merge no push" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
@@ -1032,7 +1027,6 @@ export def --env "test ci scm merge no push no delete" [] {
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.committed == true) $"Expected committed to be true"
   assert ($result.pushed == false) $"Expected pushed to be false"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
 
   mimic verify
 }
@@ -1043,12 +1037,11 @@ export def --env "test ci scm merge checkout failure" [] {
 
   mimic register git { args: ['checkout' 'main'] returns: "fatal: not a git repository" exit_code: 128 }
 
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote)
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
   assert ($result.status == "error") $"Expected error status"
   assert ($result.committed == false) $"Expected committed to be false"
   assert ($result.pushed == false) $"Expected pushed to be false"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
 
   mimic verify
 }
@@ -1064,34 +1057,11 @@ export def --env "test ci scm merge push failure" [] {
   mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
   mimic register git { args: ['push' 'origin' 'main'] returns: "fatal: remote error" exit_code: 1 }
 
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote)
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
   assert ($result.status == "error") $"Expected error status"
   assert ($result.committed == true) $"Expected committed to be true"
   assert ($result.pushed == false) $"Expected pushed to be false"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
-
-  mimic verify
-}
-
-# Test 40: branch delete failure after push
-export def --env "test ci scm merge delete failure" [] {
-  mimic reset
-
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
-  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
-  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
-  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "error: unable to delete" exit_code: 1 }
-
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote)
-
-  assert ($result.status == "error") $"Expected error status"
-  assert ($result.committed == true) $"Expected committed to be true"
-  assert ($result.pushed == true) $"Expected pushed to be true"
-  assert ($result.branch_deleted == false) $"Expected branch_deleted to be false"
 
   mimic verify
 }
@@ -1106,12 +1076,75 @@ export def --env "test ci scm merge custom target" [] {
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
   mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[develop abc123] Release 0.1.0" }
   mimic register git { args: ['push' 'origin' 'develop'] returns: "To github.com:user/repo.git" }
-  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
 
-  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --delete-remote --target develop)
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --target develop)
 
   assert ($result.status == "success") $"Expected success but got: ($result.status)"
   assert ($result.committed == true) $"Expected committed to be true"
 
   mimic verify
 }
+
+# ============================================================================
+# CLEANUP TESTS
+# ============================================================================
+
+# Test: cleanup remote-only
+export def --env "test ci scm cleanup remote only" [] {
+  mimic reset
+
+  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+
+  let result = (ci scm cleanup "release/0.1.0" --remote)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == true) $"Expected remote_deleted to be true"
+  assert ($result.local_deleted == false) $"Expected local_deleted to be false"
+
+  mimic verify
+}
+
+# Test: cleanup local-only
+export def --env "test ci scm cleanup local only" [] {
+  mimic reset
+
+  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+
+  let result = (ci scm cleanup "release/0.1.0" --local)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == false) $"Expected remote_deleted to be false"
+  assert ($result.local_deleted == true) $"Expected local_deleted to be true"
+
+  mimic verify
+}
+
+# Test: cleanup both remote and local
+export def --env "test ci scm cleanup both" [] {
+  mimic reset
+
+  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+
+  let result = (ci scm cleanup "release/0.1.0" --remote --local)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == true) $"Expected remote_deleted to be true"
+  assert ($result.local_deleted == true) $"Expected local_deleted to be true"
+
+  mimic verify
+}
+
+# Test: cleanup neither flag returns error
+export def --env "test ci scm cleanup neither" [] {
+  mimic reset
+
+  let result = (ci scm cleanup "release/0.1.0")
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.remote_deleted == false) $"Expected remote_deleted to be false"
+  assert ($result.local_deleted == false) $"Expected local_deleted to be false"
+
+  mimic verify
+}
+
