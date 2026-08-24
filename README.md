@@ -65,42 +65,124 @@ AI-powered git operations for intelligent workflow automation.
 - Requires [mods CLI](https://github.com/charmbracelet/mods) for AI integration
 
 ### CI Module
-CI/CD utilities for SCM workflows and GitHub operations.
+CI/CD utilities for SCM workflows, GitHub operations, Nix builds, Cargo versioning, Homebrew formulas, and artifact publishing.
 
 **Installation**: `nix profile install github:ck3mp3r/nu-mods#ci`
 
-**SCM Commands**:
-- `ci scm branch` - Create standardized branches with flow-based naming
+The CI module is split into submodules: `scm`, `github`, `nix`, `cargo`, `homebrew`, `artifacts`, and `log`. All are re-exported from `modules/ci/mod.nu` and are available via `use ci *`.
 
-**GitHub PR Commands**:
+#### ci scm
+SCM workflow operations.
+
+- `ci scm branch` - Create standardized branches with flow-based naming
+  - Flags: `--prefix`, `--release`, `--fix`, `--hotfix`, `--chore`, `--feature`, `--from`, `--reuse`, `--version`, `--push`
+  - `--version` uses the raw version as the branch suffix for release branches (e.g. `release/0.1.0`)
+  - `--push` pushes the branch to origin after creation
+  - Usage: `"JIRA-1234" | ci scm branch "add login" --feature --push`
+- `ci scm commit` - Commit files to git with optional message
+  - Flags: `--message (-m)`, `--push (-p)`, `--force-push`
+  - `--force-push` uses `git push --force-with-lease` when `--push` is set
+  - Usage: `"file.txt" | ci scm commit -m "feat: add feature" --push`
+- `ci scm latest-tag` - Get the latest git tag, stripping the `v` prefix. Returns `""` if no tags.
+  - Usage: `ci scm latest-tag`
+- `ci scm semver` - Calculate the next semantic version from a latest tag and current version.
+  - Accepts pre-release suffixed versions (e.g. `1.0.0-abc1234`); the semver core is extracted and the output is always clean `X.Y.Z`
+  - Usage: `ci scm semver "1.0.0" "1.0.0"` (returns `1.0.1`)
+  - Usage: `ci scm semver "1.0.0-abc1234" "1.0.0"` (returns `1.0.1`)
+- `ci scm merge` - Merge a source branch into a target branch. Squash is the DEFAULT merge strategy.
+  - Flags: `--message (-m)`, `--no-squash`, `--target` (default `main`), `--push`
+  - `--message` is required with the default squash merge; `--no-squash` uses a regular merge (auto-commits, no message needed)
+  - Guards against empty commits when the squash merge produces no staged changes
+  - Usage: `ci scm merge "release/0.1.0" -m "Release 0.1.0" --push`
+- `ci scm cleanup` - Delete a remote and/or local branch
+  - Flags: `--remote` (git push origin --delete), `--local` (git branch -D)
+  - At least one of `--remote` or `--local` is required
+  - Usage: `ci scm cleanup "release/0.1.0" --remote --local`
+- `ci scm config` - Configure git user name and email
+- `ci scm changes` - Get list of changed files since branch was created
+
+#### ci github
+GitHub operations.
+
 - `ci github pr check` - Check for existing PRs
 - `ci github pr create` - Create a new pull request
+- `ci github pr info` - Get PR information by branch name or PR number
 - `ci github pr list` - List pull requests
 - `ci github pr update` - Update existing PR (title/body)
-
-**GitHub Workflow Commands**:
+- `ci github pr merge` - Merge a pull request
+- `ci github release create` - Create a GitHub release with auto-generated changelog
+  - Flags: `--prerelease (-p)`, `--target`, `--suffix`
+  - `--prerelease` marks the release as a pre-release and appends a suffix to the tag (`v0.1.0-<sha>`)
+  - `--suffix` overrides the default short-SHA suffix for pre-release tags (e.g. `--suffix nightly`)
+  - `--target` targets a branch or commit SHA for the tag (works with or without `--prerelease`)
+  - Usage: `ci github release create "0.1.0"`
+  - Usage: `ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"`
+- `ci github release upload` - Upload artifacts to a release tag via stdin
+  - Usage: `["file1.tgz" "file2.tgz"] | ci github release upload "v0.1.0"`
+  - Usage: `["file1.tgz"] | ci github release upload "v0.1.0-abc1234"` (pre-release tag)
 - `ci github workflow list` - List workflow runs
 - `ci github workflow view` - View specific run details
 - `ci github workflow logs` - Get workflow run logs
 - `ci github workflow cancel` - Cancel a running workflow
 - `ci github workflow rerun` - Re-run a workflow
+- `ci github summary` - Add content to GitHub Actions step summary
 
-**Nix Flake Commands**:
-- `ci nix flake check` - Check flake for issues
-- `ci nix flake update` - Update flake inputs (all or specific)
-- `ci nix flake show` - Show flake outputs
-- `ci nix flake list-packages` - List all buildable packages
-- `ci nix flake build` - Build packages (all or specific)
+#### ci nix
+Nix operations (pipeline-friendly).
 
-**Nix Cache Commands**:
-- `ci nix cache push` - Push store paths to binary cache
+- `ci nix check` - Check flakes for issues
+- `ci nix update` - Update flake inputs (all or specific)
+- `ci nix packages` - List packages from flakes
+- `ci nix build` - Build packages (all or specific)
+- `ci nix closure` - Get recursive dependencies of store paths
+- `ci nix cache` - Check cache status or push store paths to a binary cache
+- `ci nix publish` - Build a flake, get its closure, check upstream and cachix caches, and push missing paths
+  - Flags: `--flake` (default `.`), `--upstream` (default `https://cache.nixos.org`)
+  - Usage: `ci nix publish mycache --flake ".#myapp"`
+- `ci nix missing-paths` - Filter cache-status records to paths missing from all caches
+  - Usage: `[{path: "..." in_upstream: false in_cachix: false}] | ci nix missing-paths mycache`
+
+#### ci cargo
+Cargo operations.
+
+- `ci cargo update-version` - Update the version in `Cargo.toml` and refresh `Cargo.lock` via `cargo check`
+  - Handles both `workspace.package.version` (workspace root) and `package.version` (single crate)
+  - Usage: `ci cargo update-version "0.2.0"`
+
+#### ci homebrew
+Homebrew formula operations.
+
+- `ci homebrew update-formula` - Update version and per-architecture sha256 hashes in a Homebrew formula (pure string transformation via stdin)
+  - Usage: `open Formula/context.rb | ci homebrew update-formula "0.2.0" "context" [{name: "aarch64-darwin" hash: "abc123"}] | save Formula/context.rb`
+
+#### ci artifacts
+Artifact platform data generation.
+
+- `ci artifacts platform-data` - Generate per-arch JSON files in `data/` from downloaded artifacts and hash files
+  - Flags: `--archive-ext`, `--hash-suffix`, `--tag`
+  - `--tag` overrides the download URL release tag (default: `v$version`)
+  - Usage: `ci artifacts platform-data "0.1.0" "./artifacts" "context"`
+  - Usage: `ci artifacts platform-data "0.1.0" "./artifacts" "context" --tag "v0.1.0-abc1234"` (pre-release)
+- `ci artifacts platform-data-for` - Checkout the release branch, generate platform data, and return created JSON files
+  - Flags: `--tag` (passed through to `platform-data`)
+  - Usage: `ci artifacts platform-data-for "0.1.0" "context"`
+  - Usage: `ci artifacts platform-data-for "0.1.0" "context" --tag "v0.1.0-abc1234"`
+
+#### ci log
+Enhanced logging.
+
+- `ci log debug` / `ci log info` / `ci log warning` / `ci log error` / `ci log critical` - Pipe-only logging with custom icons
+  - Usage: `"message" | ci log info`
 
 **Features**:
 - Standardized branch naming: `<prefix>/<flow-type>/<description>`
 - Flow types: `--feature`, `--fix`, `--hotfix`, `--release`, `--chore`
-- Pipe prefix from stdin: `"JIRA-123" | ci scm branch "description"`
-- Complete GitHub PR management
-- Workflow run inspection and control
+- Complete GitHub PR and workflow management
+- GitHub release creation with auto-generated changelogs
+- Nix flake build/cache/publish pipeline
+- Cargo version bumping with `cargo check`
+- Homebrew formula updates with per-arch sha256 hashes
+- Per-arch artifact platform data generation
 - Built-in logging with `std/log` (controlled by `NU_LOG_LEVEL`)
 
 ## Usage
@@ -125,11 +207,23 @@ ci scm branch "v2.1.0" --release --from develop
 "SEC-999" | ci scm branch "patch vulnerability" --hotfix --from production
 ci scm branch "update dependencies" --chore --no-checkout
 
+# SCM version, merge, and cleanup
+ci scm latest-tag
+ci scm semver "1.0.0" "1.0.0"
+ci scm merge "release/0.1.0" -m "Release 0.1.0" --push
+ci scm cleanup "release/0.1.0" --remote --local
+
 # GitHub PR operations
 ci github pr check --target main
 ci github pr create "feat: add feature" "Description here" --target main
 ci github pr list --state open
 ci github pr update 42 --title "New title"
+
+# GitHub release operations
+ci github release create "0.1.0"
+ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"
+["file1.tgz" "file2.tgz"] | ci github release upload "v0.1.0"
+["file1.tgz"] | ci github release upload "v0.1.0-abc1234"
 
 # GitHub workflow operations
 ci github workflow list
@@ -148,6 +242,18 @@ ci nix build
 ci nix build mypackage --impure
 ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 ["." "../backend"] | ci nix build | ci nix cache --cache s3://bucket
+ci nix publish mycache --flake ".#myapp"
+
+# Cargo version bump
+ci cargo update-version "0.2.0"
+
+# Homebrew formula update
+open Formula/context.rb | ci homebrew update-formula "0.2.0" "context" [{name: "aarch64-darwin" hash: "abc123"}]
+
+# Artifact platform data
+ci artifacts platform-data "0.1.0" "./artifacts" "context"
+ci artifacts platform-data "0.1.0" "./artifacts" "context" --tag "v0.1.0-abc1234"
+ci artifacts platform-data-for "0.1.0" "context"
 ```
 
 ## Development

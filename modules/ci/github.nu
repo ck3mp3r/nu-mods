@@ -575,3 +575,107 @@ export def "ci github workflow rerun" [
     {status: "failed" error: $err.msg run_id: $run_id}
   }
 }
+
+# GitHub release operations - show help
+export def "ci github release" [] {
+  show-help "ci github release"
+}
+
+# Create a GitHub release with auto-generated changelog
+export def "ci github release create" [
+  version: string # Release version (e.g., "0.1.0" -> tag "v0.1.0")
+  --prerelease (-p) # Mark as a pre-release and append a suffix to the tag
+  --target: string # Target branch or commit SHA for the tag
+  --suffix: string # Custom suffix for pre-release tags (default: short SHA of HEAD)
+]: [
+  nothing -> record
+] {
+  $"Creating release for version ($version)" | ci log info
+
+  # Get all tags sorted by version to find the previous tag
+  let tags = try {
+    git tag --sort=-version:refname | lines
+  } catch {|err|
+    $"Failed to get git tags: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to get git tags: ($err.msg)" version: $version url: null}
+  }
+
+  # Determine the release tag. For pre-releases, append a suffix (short SHA of HEAD by default).
+  let base_tag = $"v($version)"
+  let release_tag = if $prerelease {
+    let suffix = if ($suffix | is-not-empty) {
+      $suffix
+    } else {
+      try {
+        git rev-parse --short HEAD | str trim
+      } catch {|err|
+        $"Failed to get short SHA for pre-release: ($err.msg)" | ci log error
+        return {status: "error" error: $"Failed to get short SHA for pre-release: ($err.msg)" version: $version url: null}
+      }
+    }
+    $"($base_tag)-($suffix)"
+  } else {
+    $base_tag
+  }
+
+  # Find previous tag: first tag that is not the release tag
+  let other_tags = ($tags | where {|t| $t != $release_tag })
+  let previous_tag = if ($other_tags | is-empty) { "" } else { $other_tags | first }
+
+  # Generate changelog from git log
+  let changelog = try {
+    if ($previous_tag | is-not-empty) {
+      git log $"($previous_tag)..HEAD" --pretty=format:"- %s" --reverse
+    } else {
+      git log --pretty=format:"- %s" --reverse
+    }
+  } catch {|err|
+    $"Failed to generate changelog: ($err.msg)" | ci log error
+    ""
+  }
+
+  $"Creating GitHub release: ($release_tag)" | ci log info
+  try {
+    # Build gh release create args
+    mut gh_args = ['release' 'create' $release_tag '--title' $"Release ($release_tag)" '--notes' $changelog]
+
+    if $prerelease {
+      $gh_args = ($gh_args | append '--prerelease')
+    }
+
+    if ($target | is-not-empty) {
+      $gh_args = ($gh_args | append ['--target' $target])
+    }
+
+    let url = (gh ...$gh_args)
+    {status: "success" error: null version: $version url: $url}
+  } catch {|err|
+    $"Failed to create release: ($err.msg)" | ci log error
+    {status: "error" error: $"Failed to create release: ($err.msg)" version: $version url: null}
+  }
+}
+
+# Upload artifacts to a GitHub release
+export def "ci github release upload" [
+  tag: string # Release tag (e.g., "v0.1.0" or "v0.1.0-abc1234")
+]: [
+  list<string> -> record
+] {
+  let files = $in
+
+  if ($files | is-empty) {
+    "No files to upload" | ci log warning
+    return {status: "success" error: null tag: $tag files_uploaded: 0}
+  }
+
+  $"Uploading ($files | length) files to release ($tag)" | ci log info
+
+  try {
+    gh release upload $tag ...$files
+    {status: "success" error: null tag: $tag files_uploaded: ($files | length)}
+  } catch {|err|
+    $"Failed to upload files: ($err.msg)" | ci log error
+    {status: "error" error: $"Failed to upload files: ($err.msg)" tag: $tag files_uploaded: 0}
+  }
+}
+

@@ -715,3 +715,436 @@ export def --env "test ci scm config hyphenated email" [] {
 
   mimic verify
 }
+
+# ============================================================================
+# LATEST-TAG TESTS
+# ============================================================================
+
+# Test 25: latest-tag returns newest tag without v prefix
+export def --env "test ci scm latest-tag returns newest" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v1.2.3\nv1.0.0\nv0.9.0"
+  }
+
+  let result = (ci scm latest-tag)
+
+  assert ($result == "1.2.3") $"Expected '1.2.3' but got: ($result)"
+
+  mimic verify
+}
+
+# Test 26: latest-tag returns empty string when no tags
+export def --env "test ci scm latest-tag no tags" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: ""
+  }
+
+  let result = (ci scm latest-tag)
+
+  assert ($result == "") $"Expected empty string but got: ($result)"
+
+  mimic verify
+}
+
+# ============================================================================
+# SEMVER TESTS
+# ============================================================================
+
+# Test 27: semver with empty tag returns current version
+export def --env "test ci scm semver empty tag" [] {
+  let result = (ci scm semver "" "1.2.3")
+
+  assert ($result == "1.2.3") $"Expected '1.2.3' but got: ($result)"
+}
+
+# Test 28: semver same version increments patch
+export def --env "test ci scm semver patch increment" [] {
+  let result = (ci scm semver "1.0.0" "1.0.0")
+
+  assert ($result == "1.0.1") $"Expected '1.0.1' but got: ($result)"
+}
+
+# Test 29: semver major change returns current
+export def --env "test ci scm semver major change" [] {
+  let result = (ci scm semver "1.0.5" "2.0.0")
+
+  assert ($result == "2.0.0") $"Expected '2.0.0' but got: ($result)"
+}
+
+# Test 30: semver minor change returns current
+export def --env "test ci scm semver minor change" [] {
+  let result = (ci scm semver "1.0.5" "1.1.0")
+
+  assert ($result == "1.1.0") $"Expected '1.1.0' but got: ($result)"
+}
+
+# Test 31: semver patch ahead of tag returns current
+export def --env "test ci scm semver patch ahead" [] {
+  let result = (ci scm semver "1.0.0" "1.0.3")
+
+  assert ($result == "1.0.3") $"Expected '1.0.3' but got: ($result)"
+}
+
+# Test 31a: semver with pre-release suffix on latest_tag
+export def --env "test ci scm semver suffix on latest tag" [] {
+  let result = (ci scm semver "1.2.3-abc1234" "1.2.3")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31b: semver with pre-release suffix on current_version
+export def --env "test ci scm semver suffix on current version" [] {
+  let result = (ci scm semver "1.2.3" "1.2.3-beta")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31c: semver with pre-release suffix on both inputs
+export def --env "test ci scm semver suffix on both" [] {
+  let result = (ci scm semver "1.2.3-abc1234" "1.2.3-beta")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31d: semver with pre-release suffix on major change
+export def --env "test ci scm semver suffix major change" [] {
+  let result = (ci scm semver "1.0.5-abc1234" "2.0.0")
+
+  assert ($result == "2.0.0") $"Expected '2.0.0' but got: ($result)"
+}
+
+
+# ============================================================================
+# MERGE TESTS
+# ============================================================================
+
+# Test 32: squash merge (default) with changes commits, pushes
+export def --env "test ci scm merge squash with changes" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
+  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squash commit -- not updating HEAD" }
+  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
+  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
+  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
+
+  assert ($result.status == "success") "Expected success but got: ($result.status)"
+  assert ($result.committed == true) "Expected committed to be true"
+  assert ($result.pushed == true) "Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 33: squash merge with no changes skips commit, push
+export def --env "test ci scm merge squash no changes" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
+  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
+  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 0 }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
+
+  assert ($result.status == "success") "Expected success but got: ($result.status)"
+  assert ($result.committed == false) "Expected committed to be false"
+  assert ($result.pushed == false) "Expected pushed to be false"
+
+  mimic verify
+}
+
+# ============================================================================
+# BRANCH --VERSION AND --PUSH TESTS
+# ============================================================================
+
+# Test 37: branch --release --version --push creates release/0.1.0 and pushes
+export def --env "test ci scm branch version and push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
+  mimic register git { args: ['pull'] returns: "Already up to date." }
+  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
+  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
+  mimic register git { args: ['push' '-u' 'origin' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+
+  let result = ('0.1.0' | ci scm branch --release --version '0.1.0' --push)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.branch == "release/0.1.0") $"Expected branch release/0.1.0 but got: ($result.branch)"
+
+  mimic verify
+}
+
+# Test 38: branch --release --version without push does not push
+export def --env "test ci scm branch release version no push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
+  mimic register git { args: ['pull'] returns: "Already up to date." }
+  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
+  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
+
+  let result = ('0.1.0' | ci scm branch --release --version '0.1.0')
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.branch == "release/0.1.0") $"Expected branch release/0.1.0"
+
+  mimic verify
+}
+
+# ============================================================================
+# COMMIT --FORCE-PUSH TESTS
+# ============================================================================
+
+# Test 39: commit --push --force-push uses force-with-lease
+export def --env "test ci scm commit force push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main abc123] test" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['push' '--force-with-lease' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --push --force-push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == true) $"Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 40: commit --push without force-push uses regular push
+export def --env "test ci scm commit push no force" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main def] test" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == true) $"Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 41: commit with force-push but without push does not push
+export def --env "test ci scm commit force push without push flag" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main ghi] test" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --force-push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+# ============================================================================
+# MERGE EXTRA TESTS
+# ============================================================================
+
+# Test 34: regular merge (--no-squash) auto-commits, no message needed
+export def --env "test ci scm merge no squash" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
+  mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge made by the 'ort' strategy." }
+  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = (ci scm merge "feature/test" --no-squash --push)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.committed == true) $"Expected committed to be true"
+  assert ($result.pushed == true) $"Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 35: squash default without --message errors
+export def --env "test ci scm merge squash missing message" [] {
+  mimic reset
+
+  let result = (ci scm merge "release/0.1.0")
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.error == "--message is required with squash merge") $"Expected missing message error"
+
+  mimic verify
+}
+
+# Test 36: no-squash without --message does not error
+export def --env "test ci scm merge no-squash no message" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
+  mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge branch" }
+
+  let result = (ci scm merge "feature/test" --no-squash)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.committed == true) $"Expected committed to be true"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+# Test 37: without --push skips push
+export def --env "test ci scm merge no push" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
+  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
+  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
+  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.committed == true) $"Expected committed to be true"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+# Test 38: checkout failure returns error
+export def --env "test ci scm merge checkout failure" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "fatal: not a git repository" exit_code: 128 }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.committed == false) $"Expected committed to be false"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+# Test 39: push failure after successful commit
+export def --env "test ci scm merge push failure" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
+  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
+  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
+  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
+  mimic register git { args: ['push' 'origin' 'main'] returns: "fatal: remote error" exit_code: 1 }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.committed == true) $"Expected committed to be true"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+# Test 41: custom --target
+export def --env "test ci scm merge custom target" [] {
+  mimic reset
+
+  mimic register git { args: ['checkout' 'develop'] returns: "Switched to branch 'develop'" }
+  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
+  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
+  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
+  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[develop abc123] Release 0.1.0" }
+  mimic register git { args: ['push' 'origin' 'develop'] returns: "To github.com:user/repo.git" }
+
+  let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --target develop)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.committed == true) $"Expected committed to be true"
+
+  mimic verify
+}
+
+# ============================================================================
+# CLEANUP TESTS
+# ============================================================================
+
+# Test: cleanup remote-only
+export def --env "test ci scm cleanup remote only" [] {
+  mimic reset
+
+  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+
+  let result = (ci scm cleanup "release/0.1.0" --remote)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == true) $"Expected remote_deleted to be true"
+  assert ($result.local_deleted == false) $"Expected local_deleted to be false"
+
+  mimic verify
+}
+
+# Test: cleanup local-only
+export def --env "test ci scm cleanup local only" [] {
+  mimic reset
+
+  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+
+  let result = (ci scm cleanup "release/0.1.0" --local)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == false) $"Expected remote_deleted to be false"
+  assert ($result.local_deleted == true) $"Expected local_deleted to be true"
+
+  mimic verify
+}
+
+# Test: cleanup both remote and local
+export def --env "test ci scm cleanup both" [] {
+  mimic reset
+
+  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+
+  let result = (ci scm cleanup "release/0.1.0" --remote --local)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.remote_deleted == true) $"Expected remote_deleted to be true"
+  assert ($result.local_deleted == true) $"Expected local_deleted to be true"
+
+  mimic verify
+}
+
+# Test: cleanup neither flag returns error
+export def --env "test ci scm cleanup neither" [] {
+  mimic reset
+
+  let result = (ci scm cleanup "release/0.1.0")
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.remote_deleted == false) $"Expected remote_deleted to be false"
+  assert ($result.local_deleted == false) $"Expected local_deleted to be false"
+
+  mimic verify
+}
+

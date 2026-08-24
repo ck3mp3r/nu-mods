@@ -63,6 +63,89 @@ export def "ci scm config" [
   {status: "success" error: null name: $user_name email: $email scope: $scope}
 }
 
+# Get the latest git tag, stripping the 'v' prefix
+export def "ci scm latest-tag" []: [
+  nothing -> string
+] {
+  # Get all tags sorted by semantic version, take the newest
+  let tags = (
+    try {
+      git tag --sort=-version:refname
+    } catch {|err|
+      "Failed to get git tags" | ci log error
+      return ""
+    }
+    | lines
+  )
+
+  if ($tags | is-empty) {
+    "No tags found" | ci log info
+    return ""
+  }
+
+  # Take the first tag (newest) and strip the 'v' prefix if present
+  let latest = ($tags | first | str trim)
+  $"Latest tag: ($latest)" | ci log info
+
+  if ($latest | str starts-with "v") {
+    $latest | str replace --regex '^v' ''
+  } else {
+    $latest
+  }
+}
+
+# Calculate the next semantic version
+export def "ci scm semver" [
+  latest_tag: string # Latest git tag (X.Y.Z format, may be empty)
+  current_version: string # Current version from Cargo.toml (X.Y.Z format)
+]: [
+  nothing -> string
+] {
+  if $latest_tag == "" {
+    "No tag, keeping current version" | ci log info
+    return $current_version
+  }
+
+  # Extract the semver core (X.Y.Z) from both inputs to handle pre-release suffixes
+  let clean_tag = if ($latest_tag | parse --regex '(?<v>\d+\.\d+\.\d+)' | is-empty) {
+    $latest_tag
+  } else {
+    ($latest_tag | parse --regex '(?<v>\d+\.\d+\.\d+)' | get v | first)
+  }
+  let clean_current = if ($current_version | parse --regex '(?<v>\d+\.\d+\.\d+)' | is-empty) {
+    $current_version
+  } else {
+    ($current_version | parse --regex '(?<v>\d+\.\d+\.\d+)' | get v | first)
+  }
+
+  let tag_parts = ($clean_tag | split row "." | each {|p| $p | into int })
+  let current_parts = ($clean_current | split row "." | each {|p| $p | into int })
+
+  let tag_major = $tag_parts.0
+  let tag_minor = $tag_parts.1
+  let tag_patch = $tag_parts.2
+
+  let cur_major = $current_parts.0
+  let cur_minor = $current_parts.1
+  let cur_patch = $current_parts.2
+
+  # If major or minor differ, current version is ahead -> keep it
+  if ($tag_major != $cur_major) or ($tag_minor != $cur_minor) {
+    "Major/minor differ, keeping current version" | ci log info
+    return $clean_current
+  }
+
+  # Same major/minor: if patch is behind or equal, increment patch
+  if ($cur_patch > $tag_patch) {
+    "Patch ahead of tag, keeping current version" | ci log info
+    return $clean_current
+  }
+
+  let next_patch = ($tag_patch + 1)
+  $"Incrementing patch to ($cur_major).($cur_minor).($next_patch)" | ci log info
+  $"($cur_major).($cur_minor).($next_patch)"
+}
+
 # Create a new git branch with standardized naming convention based on SCM flow types
 export def "ci scm branch" [
   --prefix (-p): string # Optional prefix for branch name (e.g., "myproject" -> "myproject/feature/...")
@@ -73,6 +156,8 @@ export def "ci scm branch" [
   --feature # Create a feature branch (default)
   --from: string = "main" # Base branch to branch from
   --reuse # If branch exists, checkout and rebase instead of failing
+  --version: string # Release version (used as raw branch suffix for --release)
+  --push # Push branch to remote after creation
 ]: string -> record {
 
   # Get description from stdin
@@ -111,11 +196,18 @@ export def "ci scm branch" [
     | str replace --all --regex '[^a-z0-9\-\.]' ''
   )
 
+  # For release with --version, use the raw version as the branch suffix
+  let suffix = if ($release and ($version | is-not-empty)) {
+    $version
+  } else {
+    $clean_desc
+  }
+
   # Construct branch name
   let branch_name = if $prefix_val != "" {
-    $"($prefix_val)/($flow)/($clean_desc)"
+    $"($prefix_val)/($flow)/($suffix)"
   } else {
-    $"($flow)/($clean_desc)"
+    $"($flow)/($suffix)"
   }
 
   # Get current branch for context
@@ -183,6 +275,18 @@ export def "ci scm branch" [
     try {
       git switch -c $branch_name
       $"Successfully created and switched to branch: ($branch_name) from ($from)" | ci log info
+
+      # Push to remote if requested
+      if $push {
+        $"Pushing branch to origin: ($branch_name)" | ci log info
+        try {
+          git push -u origin $branch_name
+        } catch {|err|
+          $"Failed to push branch: ($err.msg)" | ci log error
+          return {status: "error" error: $"Failed to push branch: ($err.msg)" branch: $branch_name rebased: false}
+        }
+      }
+
       {status: "success" error: null branch: $branch_name rebased: false}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error
@@ -235,6 +339,7 @@ export def "ci scm changes" [
 export def "ci scm commit" [
   --message (-m): string # Commit message (default: enumerate changed files)
   --push (-p) # Push to remote after commit
+  --force-push # Use force-with-lease when pushing
 ]: [
   list<string> -> record
   string -> record
@@ -315,7 +420,11 @@ export def "ci scm commit" [
 
     $"Pushing to origin ($current_branch)" | ci log info
     try {
-      git push origin $current_branch
+      if $force_push {
+        git push --force-with-lease origin $current_branch
+      } else {
+        git push origin $current_branch
+      }
       {status: "success" error: null message: $commit_message pushed: true}
     } catch {|err|
       $"Failed to push: ($err.msg)" | ci log error
@@ -325,3 +434,144 @@ export def "ci scm commit" [
     {status: "success" error: null message: $commit_message pushed: false}
   }
 }
+
+# Merge a source branch into a target branch (squash by default)
+export def "ci scm merge" [
+  source_branch: string # Source branch to merge (e.g., "release/0.1.0")
+  --message (-m): string # Commit message (required for squash merge)
+  --no-squash # Use a regular merge instead of squash (regular merge auto-commits)
+  --target: string = "main" # Target branch to merge into
+  --push # Push the target branch to origin after commit
+]: [
+  nothing -> record
+] {
+  # Validate message requirement for squash merge
+  if (not $no_squash) and ($message | is-empty) {
+    "--message is required with squash merge" | ci log error
+    return {status: "error" error: "--message is required with squash merge" committed: false pushed: false}
+  }
+
+  # Checkout target branch
+  $"Switching to ($target)" | ci log info
+  try {
+    git checkout $target
+  } catch {|err|
+    $"Failed to checkout ($target): ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to checkout ($target): ($err.msg)" committed: false pushed: false}
+  }
+
+  # Fetch source branch
+  $"Fetching origin/($source_branch)" | ci log info
+  try {
+    git fetch origin $source_branch
+  } catch {|err|
+    $"Failed to fetch source branch: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to fetch source branch: ($err.msg)" committed: false pushed: false}
+  }
+
+  let origin_source = $"origin/($source_branch)"
+
+  if $no_squash {
+    # Regular merge - commits automatically
+    $"Merging ($origin_source) into ($target)" | ci log info
+    try {
+      git merge $origin_source
+    } catch {|err|
+      $"Failed to merge: ($err.msg)" | ci log error
+      return {status: "error" error: $"Failed to merge: ($err.msg)" committed: false pushed: false}
+    }
+  } else {
+    # Squash merge (default)
+    $"Squash merging ($origin_source) into ($target)" | ci log info
+    try {
+      git merge --squash $origin_source
+    } catch {|err|
+      $"Failed to squash merge: ($err.msg)" | ci log error
+      return {status: "error" error: $"Failed to squash merge: ($err.msg)" committed: false pushed: false}
+    }
+
+    # Check for staged changes (git diff --cached --quiet exits 0 if clean, non-zero if changes)
+    let has_changes = try {
+      git diff --cached --quiet | ignore
+      false
+    } catch {|err|
+      true
+    }
+
+    if not $has_changes {
+      "No changes to merge, skipping commit and push" | ci log warning
+      return {status: "success" error: null committed: false pushed: false}
+    }
+
+    # Commit with provided message
+    $"Committing: ($message)" | ci log info
+    try {
+      git commit -m $message
+    } catch {|err|
+      $"Failed to commit: ($err.msg)" | ci log error
+      return {status: "error" error: $"Failed to commit: ($err.msg)" committed: false pushed: false}
+    }
+  }
+
+  # Push to target if requested
+  if $push {
+    $"Pushing to origin ($target)" | ci log info
+    try {
+      git push origin $target
+    } catch {|err|
+      $"Failed to push to ($target): ($err.msg)" | ci log error
+      return {status: "error" error: $"Failed to push to ($target): ($err.msg)" committed: true pushed: false}
+    }
+  }
+
+  {status: "success" error: null committed: true pushed: $push}
+}
+
+# Delete a remote and/or local branch
+export def "ci scm cleanup" [
+  branch: string # Branch to delete
+  --remote # Delete the remote branch via git push origin --delete
+  --local # Delete the local branch via git branch -D
+]: [
+  nothing -> record
+] {
+  if (not $remote) and (not $local) {
+    "Either --remote or --local is required" | ci log error
+    return {status: "error" error: "Either --remote or --local is required" remote_deleted: false local_deleted: false}
+  }
+
+  mut remote_deleted = false
+  mut local_deleted = false
+
+  if $remote {
+    $"Deleting remote branch: origin/($branch)" | ci log info
+    try {
+      git push origin --delete $branch
+      $remote_deleted = true
+    } catch {|err|
+      $"Failed to delete remote branch: ($err.msg)" | ci log error
+    }
+  }
+
+  if $local {
+    $"Deleting local branch: ($branch)" | ci log info
+    try {
+      git branch -D $branch
+      $local_deleted = true
+    } catch {|err|
+      $"Failed to delete local branch: ($err.msg)" | ci log error
+    }
+  }
+
+  if $remote_deleted and $local_deleted {
+    {status: "success" error: null remote_deleted: true local_deleted: true}
+  } else if $remote_deleted {
+    {status: "success" error: null remote_deleted: true local_deleted: false}
+  } else if $local_deleted {
+    {status: "success" error: null remote_deleted: false local_deleted: true}
+  } else {
+    {status: "error" error: "Failed to delete branch" remote_deleted: false local_deleted: false}
+  }
+}
+
+

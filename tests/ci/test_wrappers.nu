@@ -24,6 +24,11 @@ export def --env --wrapped gh [...args] {
   mimic call 'gh' $args
 }
 
+# Wrapped cargo command
+export def --env --wrapped cargo [...args] {
+  mimic call 'cargo' $args
+}
+
 # Wrapped agent command - captures piped input via $in
 export def --env --wrapped agent [...args] {
   let input = $in

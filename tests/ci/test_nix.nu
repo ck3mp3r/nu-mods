@@ -552,6 +552,175 @@ use modules/ci/nix.nu *
   rm -rf $temp_dir
 }
 
+# ============================================================================
+# PUBLISH TESTS
+# ============================================================================
+
+# Test: publish builds, gets closure, pushes missing paths
+export def --env "test ci nix publish all" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['build' '.#myapp' '--json' '--no-link']
+    returns: ""
+  }
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '.#myapp']
+    returns: "/nix/store/a\n/nix/store/b\n/nix/store/c"
+  }
+
+  # path a in upstream
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/a']
+    returns: "/nix/store/a"
+  }
+
+  # path b in upstream
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/b']
+    returns: "/nix/store/b"
+  }
+
+  # path c not in upstream
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/c']
+    returns: "error: path not found"
+    exit_code: 1
+  }
+
+  # path c not in cachix either
+  mimic register nix {
+    args: ['path-info' '--store' 'https://mycache.cachix.org' '/nix/store/c']
+    returns: "error: path not found"
+    exit_code: 1
+  }
+
+  # push path c
+  mimic register cachix {
+    args: ['push' 'mycache' '/nix/store/c']
+    returns: ""
+  }
+
+  let result = (ci nix publish mycache --flake '.#myapp')
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.pushed_count == 1) $"Expected 1 pushed but got: ($result.pushed_count)"
+  assert ($result.skipped_count == 2) $"Expected 2 skipped but got: ($result.skipped_count)"
+  assert ($result.total_paths == 3) $"Expected 3 total paths"
+
+  mimic verify
+}
+
+# Test: publish build failure returns error
+export def --env "test ci nix publish build failure" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['build' '.#myapp' '--json' '--no-link']
+    returns: "error: build failed"
+    exit_code: 1
+  }
+
+  let result = (ci nix publish mycache --flake '.#myapp')
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.pushed_count == 0) $"Expected 0 pushed"
+  assert ($result.skipped_count == 0) $"Expected 0 skipped"
+
+  mimic verify
+}
+
+# Test: publish all paths already upstream - no cachix push
+export def --env "test ci nix publish all cached" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['build' '.#myapp' '--json' '--no-link']
+    returns: ""
+  }
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '.#myapp']
+    returns: "/nix/store/a\n/nix/store/b\n/nix/store/c"
+  }
+
+  # all three in upstream
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/a']
+    returns: "/nix/store/a"
+  }
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/b']
+    returns: "/nix/store/b"
+  }
+  mimic register nix {
+    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/c']
+    returns: "/nix/store/c"
+  }
+
+  let result = (ci nix publish mycache --flake '.#myapp')
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed_count == 0) $"Expected 0 pushed"
+  assert ($result.skipped_count == 3) $"Expected 3 skipped"
+
+  mimic verify
+}
+
+# ============================================================================
+# MISSING-PATHS TESTS
+# ============================================================================
+
+# Test: missing-paths filters to not cached
+export def "test ci nix missing-paths filter" [] {
+  let records = [
+    {path: "/nix/store/abc" in_upstream: true in_cachix: false}
+    {path: "/nix/store/def" in_upstream: false in_cachix: false}
+  ]
+
+  let result = ($records | ci nix missing-paths mycache)
+
+  assert (($result | length) == 1) $"Expected 1 missing"
+  assert ($result.0 == "/nix/store/def") $"Expected /nix/store/def"
+}
+
+# Test: missing-paths all cached returns empty
+export def "test ci nix missing-paths all cached" [] {
+  let records = [
+    {path: "/nix/store/abc" in_upstream: true in_cachix: false}
+  ]
+
+  let result = ($records | ci nix missing-paths mycache)
+
+  assert (($result | length) == 0) $"Expected empty result"
+}
+
+# Test: missing-paths writes summary to GITHUB_STEP_SUMMARY
+export def "test ci nix missing-paths summary" [] {
+  let test_file = $"/tmp/nu_nix_summary_(random chars).md"
+
+  with-env {
+    GITHUB_STEP_SUMMARY: $test_file
+  } {
+    try {
+      let records = [
+        {path: "/nix/store/abc" in_upstream: true in_cachix: false}
+        {path: "/nix/store/def" in_upstream: false in_cachix: false}
+      ]
+
+      let result = ($records | ci nix missing-paths mycache)
+
+      let summary = (open --raw $test_file)
+
+      assert ($summary =~ "Cache|Count") $"Expected markdown table with cache header"
+      assert (($result | length) == 1) $"Expected 1 missing"
+    } finally {
+      rm -f $test_file
+    }
+  }
+}
+
 # Test 26: Filter flakes - empty list
 export def "test ci nix flakes empty input" [] {
   let test_script = "
