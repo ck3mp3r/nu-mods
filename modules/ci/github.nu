@@ -575,3 +575,77 @@ export def "ci github workflow rerun" [
     {status: "failed" error: $err.msg run_id: $run_id}
   }
 }
+
+# GitHub release operations - show help
+export def "ci github release" [] {
+  show-help "ci github release"
+}
+
+# Create a GitHub release with auto-generated changelog
+export def "ci github release create" [
+  version: string # Release version (e.g., "0.1.0" -> tag "v0.1.0")
+]: [
+  nothing -> record
+] {
+  $"Creating release for version ($version)" | ci log info
+
+  # Get all tags sorted by version to find the previous tag
+  let tags = try {
+    git tag --sort=-version:refname | lines
+  } catch {|err|
+    $"Failed to get git tags: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to get git tags: ($err.msg)" version: $version url: null}
+  }
+
+  # Find previous tag: first tag that is not v$version
+  let release_tag = $"v($version)"
+  let other_tags = ($tags | where {|t| $t != $release_tag })
+  let previous_tag = if ($other_tags | is-empty) { "" } else { $other_tags | first }
+
+  # Generate changelog from git log
+  let changelog = try {
+    if ($previous_tag | is-not-empty) {
+      git log $"($previous_tag)..HEAD" --pretty=format:"- %s" --reverse
+    } else {
+      git log --pretty=format:"- %s" --reverse
+    }
+  } catch {|err|
+    $"Failed to generate changelog: ($err.msg)" | ci log error
+    ""
+  }
+
+  $"Creating GitHub release: ($release_tag)" | ci log info
+  try {
+    let url = (gh release create $release_tag --title $"Release ($release_tag)" --notes $changelog)
+    {status: "success" error: null version: $version url: $url}
+  } catch {|err|
+    $"Failed to create release: ($err.msg)" | ci log error
+    {status: "error" error: $"Failed to create release: ($err.msg)" version: $version url: null}
+  }
+}
+
+# Upload artifacts to a GitHub release
+export def "ci github release upload" [
+  version: string # Release version (e.g., "0.1.0" -> tag "v0.1.0")
+]: [
+  list<string> -> record
+] {
+  let files = $in
+
+  if ($files | is-empty) {
+    "No files to upload" | ci log warning
+    return {status: "success" error: null version: $version files_uploaded: 0}
+  }
+
+  let release_tag = $"v($version)"
+  $"Uploading ($files | length) files to release ($release_tag)" | ci log info
+
+  try {
+    gh release upload $release_tag ...$files
+    {status: "success" error: null version: $version files_uploaded: ($files | length)}
+  } catch {|err|
+    $"Failed to upload files: ($err.msg)" | ci log error
+    {status: "error" error: $"Failed to upload files: ($err.msg)" version: $version files_uploaded: 0}
+  }
+}
+

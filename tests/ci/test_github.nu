@@ -474,3 +474,139 @@ export def --env "test ci github workflow rerun" [] {
 
   mimic verify
 }
+
+# ============================================================================
+# RELEASE TESTS
+# ============================================================================
+
+# Test: release create with previous tag generates changelog
+export def --env "test ci github release create with previous tag" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.1.0\nv0.0.5"
+  }
+
+  mimic register git {
+    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    returns: "- feat: add feature\n- fix: fix bug"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0' '--title' 'Release v0.1.0' '--notes' "- feat: add feature\n- fix: fix bug"]
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0"
+  }
+
+  let result = (ci github release create "0.1.0")
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.version == "0.1.0") $"Expected version 0.1.0"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0") $"Expected url"
+
+  mimic verify
+}
+
+# Test: release create with no previous tag (first release)
+export def --env "test ci github release create first release" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.1.0"
+  }
+
+  mimic register git {
+    args: ['log' '--pretty=format:- %s' '--reverse']
+    returns: "- initial commit"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0' '--title' 'Release v0.1.0' '--notes' '- initial commit']
+    returns: "https://github.com/owner/repo/releases/tag/v0.1.0"
+  }
+
+  let result = (ci github release create "0.1.0")
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.version == "0.1.0") $"Expected version 0.1.0"
+  assert ($result.url == "https://github.com/owner/repo/releases/tag/v0.1.0") $"Expected url"
+
+  mimic verify
+}
+
+# Test: release create failure
+export def --env "test ci github release create failure" [] {
+  mimic reset
+
+  mimic register git {
+    args: ['tag' '--sort=-version:refname']
+    returns: "v0.1.0"
+  }
+
+  mimic register git {
+    args: ['log' '--pretty=format:- %s' '--reverse']
+    returns: "- initial commit"
+  }
+
+  mimic register gh {
+    args: ['release' 'create' 'v0.1.0' '--title' 'Release v0.1.0' '--notes' '- initial commit']
+    returns: "error: create failed"
+    exit_code: 1
+  }
+
+  let result = (ci github release create "0.1.0")
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.version == "0.1.0") $"Expected version"
+  assert ($result.url == null) $"Expected null url"
+
+  mimic verify
+}
+
+# Test: release upload with files
+export def --env "test ci github release upload with files" [] {
+  mimic reset
+
+  mimic register gh {
+    args: ['release' 'upload' 'v0.1.0' 'file1.tgz' 'file2.tgz']
+    returns: ""
+  }
+
+  let result = (['file1.tgz' 'file2.tgz'] | ci github release upload "0.1.0")
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.files_uploaded == 2) $"Expected 2 files uploaded"
+
+  mimic verify
+}
+
+# Test: release upload empty file list does not call gh
+export def --env "test ci github release upload empty" [] {
+  mimic reset
+
+  let result = ([] | ci github release upload "0.1.0")
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.files_uploaded == 0) $"Expected 0 files"
+
+  mimic verify
+}
+
+# Test: release upload failure
+export def --env "test ci github release upload failure" [] {
+  mimic reset
+
+  mimic register gh {
+    args: ['release' 'upload' 'v0.1.0' 'file1.tgz']
+    returns: "error: upload failed"
+    exit_code: 1
+  }
+
+  let result = (['file1.tgz'] | ci github release upload "0.1.0")
+
+  assert ($result.status == "error") $"Expected error status"
+  assert ($result.files_uploaded == 0) $"Expected 0 files"
+
+  mimic verify
+}
