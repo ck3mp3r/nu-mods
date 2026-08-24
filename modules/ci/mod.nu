@@ -33,3 +33,6 @@ export use ./cargo.nu *
 
 # Re-export all homebrew commands from homebrew.nu
 export use ./homebrew.nu *
+
+# Re-export all artifacts commands from artifacts.nu
+export use ./artifacts.nu *
