@@ -86,7 +86,9 @@ SCM workflow operations.
 - `ci scm latest-tag` - Get the latest git tag, stripping the `v` prefix. Returns `""` if no tags.
   - Usage: `ci scm latest-tag`
 - `ci scm semver` - Calculate the next semantic version from a latest tag and current version.
+  - Accepts pre-release suffixed versions (e.g. `1.0.0-abc1234`); the semver core is extracted and the output is always clean `X.Y.Z`
   - Usage: `ci scm semver "1.0.0" "1.0.0"` (returns `1.0.1`)
+  - Usage: `ci scm semver "1.0.0-abc1234" "1.0.0"` (returns `1.0.1`)
 - `ci scm merge` - Merge a source branch into a target branch. Squash is the DEFAULT merge strategy.
   - Flags: `--message (-m)`, `--no-squash`, `--delete-remote`, `--target` (default `main`), `--push`
   - `--message` is required with the default squash merge; `--no-squash` uses a regular merge (auto-commits, no message needed)

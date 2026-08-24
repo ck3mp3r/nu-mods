@@ -791,6 +791,35 @@ export def --env "test ci scm semver patch ahead" [] {
   assert ($result == "1.0.3") $"Expected '1.0.3' but got: ($result)"
 }
 
+# Test 31a: semver with pre-release suffix on latest_tag
+export def --env "test ci scm semver suffix on latest tag" [] {
+  let result = (ci scm semver "1.2.3-abc1234" "1.2.3")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31b: semver with pre-release suffix on current_version
+export def --env "test ci scm semver suffix on current version" [] {
+  let result = (ci scm semver "1.2.3" "1.2.3-beta")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31c: semver with pre-release suffix on both inputs
+export def --env "test ci scm semver suffix on both" [] {
+  let result = (ci scm semver "1.2.3-abc1234" "1.2.3-beta")
+
+  assert ($result == "1.2.4") $"Expected '1.2.4' but got: ($result)"
+}
+
+# Test 31d: semver with pre-release suffix on major change
+export def --env "test ci scm semver suffix major change" [] {
+  let result = (ci scm semver "1.0.5-abc1234" "2.0.0")
+
+  assert ($result == "2.0.0") $"Expected '2.0.0' but got: ($result)"
+}
+
+
 # ============================================================================
 # MERGE TESTS
 # ============================================================================

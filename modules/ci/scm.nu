@@ -106,8 +106,20 @@ export def "ci scm semver" [
     return $current_version
   }
 
-  let tag_parts = ($latest_tag | split row "." | each {|p| $p | into int })
-  let current_parts = ($current_version | split row "." | each {|p| $p | into int })
+  # Extract the semver core (X.Y.Z) from both inputs to handle pre-release suffixes
+  let clean_tag = if ($latest_tag | parse --regex '(?<v>\d+\.\d+\.\d+)' | is-empty) {
+    $latest_tag
+  } else {
+    ($latest_tag | parse --regex '(?<v>\d+\.\d+\.\d+)' | get v | first)
+  }
+  let clean_current = if ($current_version | parse --regex '(?<v>\d+\.\d+\.\d+)' | is-empty) {
+    $current_version
+  } else {
+    ($current_version | parse --regex '(?<v>\d+\.\d+\.\d+)' | get v | first)
+  }
+
+  let tag_parts = ($clean_tag | split row "." | each {|p| $p | into int })
+  let current_parts = ($clean_current | split row "." | each {|p| $p | into int })
 
   let tag_major = $tag_parts.0
   let tag_minor = $tag_parts.1
@@ -120,13 +132,13 @@ export def "ci scm semver" [
   # If major or minor differ, current version is ahead -> keep it
   if ($tag_major != $cur_major) or ($tag_minor != $cur_minor) {
     "Major/minor differ, keeping current version" | ci log info
-    return $current_version
+    return $clean_current
   }
 
   # Same major/minor: if patch is behind or equal, increment patch
   if ($cur_patch > $tag_patch) {
     "Patch ahead of tag, keeping current version" | ci log info
-    return $current_version
+    return $clean_current
   }
 
   let next_patch = ($tag_patch + 1)
