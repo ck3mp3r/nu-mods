@@ -144,6 +144,8 @@ export def "ci scm branch" [
   --feature # Create a feature branch (default)
   --from: string = "main" # Base branch to branch from
   --reuse # If branch exists, checkout and rebase instead of failing
+  --version: string # Release version (used as raw branch suffix for --release)
+  --push # Push branch to remote after creation
 ]: string -> record {
 
   # Get description from stdin
@@ -182,11 +184,18 @@ export def "ci scm branch" [
     | str replace --all --regex '[^a-z0-9\-\.]' ''
   )
 
+  # For release with --version, use the raw version as the branch suffix
+  let suffix = if ($release and ($version | is-not-empty)) {
+    $version
+  } else {
+    $clean_desc
+  }
+
   # Construct branch name
   let branch_name = if $prefix_val != "" {
-    $"($prefix_val)/($flow)/($clean_desc)"
+    $"($prefix_val)/($flow)/($suffix)"
   } else {
-    $"($flow)/($clean_desc)"
+    $"($flow)/($suffix)"
   }
 
   # Get current branch for context
@@ -254,6 +263,18 @@ export def "ci scm branch" [
     try {
       git switch -c $branch_name
       $"Successfully created and switched to branch: ($branch_name) from ($from)" | ci log info
+
+      # Push to remote if requested
+      if $push {
+        $"Pushing branch to origin: ($branch_name)" | ci log info
+        try {
+          git push -u origin $branch_name
+        } catch {|err|
+          $"Failed to push branch: ($err.msg)" | ci log error
+          return {status: "error" error: $"Failed to push branch: ($err.msg)" branch: $branch_name rebased: false}
+        }
+      }
+
       {status: "success" error: null branch: $branch_name rebased: false}
     } catch {|err|
       $"Failed to create branch: ($err.msg)" | ci log error
@@ -306,6 +327,7 @@ export def "ci scm changes" [
 export def "ci scm commit" [
   --message (-m): string # Commit message (default: enumerate changed files)
   --push (-p) # Push to remote after commit
+  --force-push # Use force-with-lease when pushing
 ]: [
   list<string> -> record
   string -> record
@@ -386,7 +408,11 @@ export def "ci scm commit" [
 
     $"Pushing to origin ($current_branch)" | ci log info
     try {
-      git push origin $current_branch
+      if $force_push {
+        git push --force-with-lease origin $current_branch
+      } else {
+        git push origin $current_branch
+      }
       {status: "success" error: null message: $commit_message pushed: true}
     } catch {|err|
       $"Failed to push: ($err.msg)" | ci log error

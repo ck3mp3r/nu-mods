@@ -836,6 +836,106 @@ export def --env "test ci scm merge-release no changes" [] {
   mimic verify
 }
 
+# ============================================================================
+# BRANCH --VERSION AND --PUSH TESTS
+# ============================================================================
+
+# Test 37: branch --release --version --push creates release/0.1.0 and pushes
+export def --env "test ci scm branch version and push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
+  mimic register git { args: ['pull'] returns: "Already up to date." }
+  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
+  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
+  mimic register git { args: ['push' '-u' 'origin' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+
+  let result = ('0.1.0' | ci scm branch --release --version '0.1.0' --push)
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.branch == "release/0.1.0") $"Expected branch release/0.1.0 but got: ($result.branch)"
+
+  mimic verify
+}
+
+# Test 38: branch --release --version without push does not push
+export def --env "test ci scm branch release version no push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
+  mimic register git { args: ['pull'] returns: "Already up to date." }
+  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
+  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
+
+  let result = ('0.1.0' | ci scm branch --release --version '0.1.0')
+
+  assert ($result.status == "success") $"Expected success but got: ($result.status)"
+  assert ($result.branch == "release/0.1.0") $"Expected branch release/0.1.0"
+
+  mimic verify
+}
+
+# ============================================================================
+# COMMIT --FORCE-PUSH TESTS
+# ============================================================================
+
+# Test 39: commit --push --force-push uses force-with-lease
+export def --env "test ci scm commit force push" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main abc123] test" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['push' '--force-with-lease' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --push --force-push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == true) $"Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 40: commit --push without force-push uses regular push
+export def --env "test ci scm commit push no force" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main def] test" }
+  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
+  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == true) $"Expected pushed to be true"
+
+  mimic verify
+}
+
+# Test 41: commit with force-push but without push does not push
+export def --env "test ci scm commit force push without push flag" [] {
+  mimic reset
+
+  mimic register git { args: ['status' '--porcelain'] returns: "" }
+  mimic register git { args: ['add' 'file.txt'] returns: "" }
+  mimic register git { args: ['commit' '-m' 'test'] returns: "[main ghi] test" }
+
+  let result = ('file.txt' | ci scm commit -m 'test' --force-push)
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.pushed == false) $"Expected pushed to be false"
+
+  mimic verify
+}
+
+
 # Test 34: merge-release checkout failure
 export def --env "test ci scm merge-release checkout failure" [] {
   mimic reset
