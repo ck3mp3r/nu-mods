@@ -111,8 +111,9 @@ GitHub operations.
   - `--target` targets a branch or commit SHA for the tag (works with or without `--prerelease`)
   - Usage: `ci github release create "0.1.0"`
   - Usage: `ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"`
-- `ci github release upload` - Upload artifacts to a release via stdin
-  - Usage: `["file1.tgz" "file2.tgz"] | ci github release upload "0.1.0"`
+- `ci github release upload` - Upload artifacts to a release tag via stdin
+  - Usage: `["file1.tgz" "file2.tgz"] | ci github release upload "v0.1.0"`
+  - Usage: `["file1.tgz"] | ci github release upload "v0.1.0-abc1234"` (pre-release tag)
 - `ci github workflow list` - List workflow runs
 - `ci github workflow view` - View specific run details
 - `ci github workflow logs` - Get workflow run logs
@@ -152,9 +153,14 @@ Homebrew formula operations.
 Artifact platform data generation.
 
 - `ci artifacts platform-data` - Generate per-arch JSON files in `data/` from downloaded artifacts and hash files
+  - Flags: `--archive-ext`, `--hash-suffix`, `--tag`
+  - `--tag` overrides the download URL release tag (default: `v$version`)
   - Usage: `ci artifacts platform-data "0.1.0" "./artifacts" "context"`
+  - Usage: `ci artifacts platform-data "0.1.0" "./artifacts" "context" --tag "v0.1.0-abc1234"` (pre-release)
 - `ci artifacts platform-data-for` - Checkout the release branch, generate platform data, and return created JSON files
+  - Flags: `--tag` (passed through to `platform-data`)
   - Usage: `ci artifacts platform-data-for "0.1.0" "context"`
+  - Usage: `ci artifacts platform-data-for "0.1.0" "context" --tag "v0.1.0-abc1234"`
 
 #### ci log
 Enhanced logging.
@@ -209,7 +215,8 @@ ci github pr update 42 --title "New title"
 # GitHub release operations
 ci github release create "0.1.0"
 ci github release create "0.1.0" --prerelease --target "release/0.1.0" --suffix "nightly"
-["file1.tgz" "file2.tgz"] | ci github release upload "0.1.0"
+["file1.tgz" "file2.tgz"] | ci github release upload "v0.1.0"
+["file1.tgz"] | ci github release upload "v0.1.0-abc1234"
 
 # GitHub workflow operations
 ci github workflow list
@@ -238,6 +245,7 @@ open Formula/context.rb | ci homebrew update-formula "0.2.0" "context" [{name: "
 
 # Artifact platform data
 ci artifacts platform-data "0.1.0" "./artifacts" "context"
+ci artifacts platform-data "0.1.0" "./artifacts" "context" --tag "v0.1.0-abc1234"
 ci artifacts platform-data-for "0.1.0" "context"
 ```
 

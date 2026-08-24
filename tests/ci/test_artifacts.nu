@@ -105,3 +105,30 @@ export def "test ci artifacts platform data missing hash" [] {
     rm -rf $temp_dir
   }
 }
+
+# Test: platform-data with --tag uses suffixed tag in URL
+export def --env "test ci artifacts platform data with tag" [] {
+  let temp_dir = (mktemp -d)
+  let original_dir = (pwd)
+
+  try {
+    mkdir ($temp_dir | path join "artifacts")
+    touch ($temp_dir | path join "artifacts/context-0.1.0-x86_64-linux.tgz")
+    "abc123def456" | save ($temp_dir | path join "artifacts/context-0.1.0-x86_64-linux-nix.sha256")
+
+    cd $temp_dir
+    with-env {GITHUB_REPOSITORY: "owner/repo"} {
+      let result = (ci artifacts platform-data "0.1.0" "artifacts" "context" --tag "v0.1.0-abc1234")
+      assert (($result | length) == 1) $"Expected 1 file"
+    }
+    cd $original_dir
+
+    let data = (open --raw ($temp_dir | path join "data/x86_64-linux.json"))
+    assert ($data =~ "v0.1.0-abc1234") $"Expected suffixed tag in url"
+    assert (not ($data =~ "releases/download/v0.1.0/")) $"Expected no plain v0.1.0 tag in url"
+  } finally {
+    cd $original_dir
+    rm -rf $temp_dir
+  }
+}
+

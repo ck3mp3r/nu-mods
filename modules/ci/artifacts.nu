@@ -13,6 +13,7 @@ export def "ci artifacts platform-data" [
   project_name: string
   --archive-ext: string = ".tgz"
   --hash-suffix: string = "-nix.sha256"
+  --tag: string # Release tag for download URLs (default: v$version)
 ]: [
   nothing -> list<string>
 ] {
@@ -23,6 +24,7 @@ export def "ci artifacts platform-data" [
 
   let archive_files = (glob $"($artifacts_path)/**/*($archive_ext)")
   let repo = ($env.GITHUB_REPOSITORY? | default "")
+  let release_tag = ($tag | default $"v($version)")
 
   mut created = []
 
@@ -39,7 +41,7 @@ export def "ci artifacts platform-data" [
       continue
     }
 
-    let url = $"https://github.com/($repo)/releases/download/v($version)/($filename)"
+    let url = $"https://github.com/($repo)/releases/download/($release_tag)/($filename)"
 
     let platform_data = {url: $url hash: $hash}
     $platform_data | to json | save --force $"data/($platform).json"
@@ -55,6 +57,7 @@ export def "ci artifacts platform-data-for" [
   version: string
   project_name: string
   artifacts_path: string = "./artifacts"
+  --tag: string # Release tag for download URLs (passed through to platform-data)
 ]: [
   nothing -> list<string>
 ] {
@@ -68,7 +71,11 @@ export def "ci artifacts platform-data-for" [
     return []
   }
 
-  ci artifacts platform-data $version $artifacts_path $project_name
+  if ($tag | is-not-empty) {
+    ci artifacts platform-data $version $artifacts_path $project_name --tag $tag
+  } else {
+    ci artifacts platform-data $version $artifacts_path $project_name
+  }
 
   glob "data/*.json"
 }

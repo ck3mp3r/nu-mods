@@ -573,10 +573,11 @@ export def --env "test ci github release upload with files" [] {
     returns: ""
   }
 
-  let result = (['file1.tgz' 'file2.tgz'] | ci github release upload "0.1.0")
+  let result = (['file1.tgz' 'file2.tgz'] | ci github release upload "v0.1.0")
 
   assert ($result.status == "success") $"Expected success"
   assert ($result.files_uploaded == 2) $"Expected 2 files uploaded"
+  assert ($result.tag == "v0.1.0") $"Expected tag"
 
   mimic verify
 }
@@ -585,10 +586,11 @@ export def --env "test ci github release upload with files" [] {
 export def --env "test ci github release upload empty" [] {
   mimic reset
 
-  let result = ([] | ci github release upload "0.1.0")
+  let result = ([] | ci github release upload "v0.1.0")
 
   assert ($result.status == "success") $"Expected success"
   assert ($result.files_uploaded == 0) $"Expected 0 files"
+  assert ($result.tag == "v0.1.0") $"Expected tag"
 
   mimic verify
 }
@@ -603,10 +605,29 @@ export def --env "test ci github release upload failure" [] {
     exit_code: 1
   }
 
-  let result = (['file1.tgz'] | ci github release upload "0.1.0")
+  let result = (['file1.tgz'] | ci github release upload "v0.1.0")
 
   assert ($result.status == "error") $"Expected error status"
   assert ($result.files_uploaded == 0) $"Expected 0 files"
+  assert ($result.tag == "v0.1.0") $"Expected tag"
+
+  mimic verify
+}
+
+# Test: release upload to pre-release tag
+export def --env "test ci github release upload pre-release tag" [] {
+  mimic reset
+
+  mimic register gh {
+    args: ['release' 'upload' 'v0.1.0-abc1234' 'file1.tgz']
+    returns: ""
+  }
+
+  let result = (['file1.tgz'] | ci github release upload "v0.1.0-abc1234")
+
+  assert ($result.status == "success") $"Expected success"
+  assert ($result.files_uploaded == 1) $"Expected 1 file uploaded"
+  assert ($result.tag == "v0.1.0-abc1234") $"Expected pre-release tag"
 
   mimic verify
 }

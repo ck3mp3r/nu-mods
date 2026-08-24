@@ -657,7 +657,7 @@ export def "ci github release create" [
 
 # Upload artifacts to a GitHub release
 export def "ci github release upload" [
-  version: string # Release version (e.g., "0.1.0" -> tag "v0.1.0")
+  tag: string # Release tag (e.g., "v0.1.0" or "v0.1.0-abc1234")
 ]: [
   list<string> -> record
 ] {
@@ -665,18 +665,17 @@ export def "ci github release upload" [
 
   if ($files | is-empty) {
     "No files to upload" | ci log warning
-    return {status: "success" error: null version: $version files_uploaded: 0}
+    return {status: "success" error: null tag: $tag files_uploaded: 0}
   }
 
-  let release_tag = $"v($version)"
-  $"Uploading ($files | length) files to release ($release_tag)" | ci log info
+  $"Uploading ($files | length) files to release ($tag)" | ci log info
 
   try {
-    gh release upload $release_tag ...$files
-    {status: "success" error: null version: $version files_uploaded: ($files | length)}
+    gh release upload $tag ...$files
+    {status: "success" error: null tag: $tag files_uploaded: ($files | length)}
   } catch {|err|
     $"Failed to upload files: ($err.msg)" | ci log error
-    {status: "error" error: $"Failed to upload files: ($err.msg)" version: $version files_uploaded: 0}
+    {status: "error" error: $"Failed to upload files: ($err.msg)" tag: $tag files_uploaded: 0}
   }
 }
 
