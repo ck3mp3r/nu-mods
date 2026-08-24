@@ -514,3 +514,116 @@ export def "ci nix cache" [
     }
   }
 }
+
+# Publish a flake output to a binary cache: build, get closure, check caches, push missing
+export def "ci nix publish" [
+  cache: string # Cache name or URI to push to
+  --flake: string = "." # Flake target to build (e.g., ".#myapp")
+  --upstream: string = "https://cache.nixos.org" # Upstream cache to check against
+]: [
+  nothing -> record
+] {
+  $"Publishing ($flake) to ($cache)" | ci log info
+
+  # Build the flake
+  $"Building ($flake)" | ci log info
+  try {
+    nix build $flake --json --no-link
+  } catch {|err|
+    $"Failed to build ($flake): ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to build ($flake): ($err.msg)" cache: $cache flake: $flake total_paths: 0 pushed_count: 0 skipped_count: 0}
+  }
+
+  # Get the closure (all recursive dependencies)
+  $"Getting closure for ($flake)" | ci log info
+  let paths = (
+    try {
+      nix path-info --recursive $flake | lines | where {|line| ($line | str trim | is-not-empty) }
+    } catch {|err|
+      $"Failed to get closure: ($err.msg)" | ci log error
+      return {status: "error" error: $"Failed to get closure: ($err.msg)" cache: $cache flake: $flake total_paths: 0 pushed_count: 0 skipped_count: 0}
+    }
+  )
+
+  let cachix_url = if ($cache =~ '^https?://.*\.cachix\.org') {
+    $cache
+  } else {
+    $"https://($cache).cachix.org"
+  }
+
+  # Check each path against upstream and cachix, push if missing from both
+  mut pushed = 0
+  mut skipped = 0
+
+  for path in $paths {
+    $"Checking cache status for path: ($path)" | ci log info
+
+    # Check upstream cache
+    let in_upstream = (
+      try {
+        nix path-info --store $upstream $path
+        true
+      } catch {
+        false
+      }
+    )
+
+    # Check cachix cache (if not already in upstream)
+    let in_cachix = if $in_upstream {
+      true
+    } else {
+      try {
+        nix path-info --store $cachix_url $path
+        true
+      } catch {
+        false
+      }
+    }
+
+    if $in_upstream or $in_cachix {
+      $"Skipping ($path) - already cached" | ci log info
+      $skipped = ($skipped + 1)
+    } else {
+      $"Pushing ($path) to cachix" | ci log info
+      let cache_name = if ($cache =~ '^https?://.*\.cachix\.org') {
+        ($cache | parse 'https://{name}.cachix.org' | get name.0)
+      } else {
+        $cache
+      }
+      try {
+        cachix push $cache_name $path
+        $pushed = ($pushed + 1)
+      } catch {|err|
+        $"Failed to push ($path): ($err.msg)" | ci log error
+      }
+    }
+  }
+
+  {status: "success" error: null cache: $cache flake: $flake total_paths: ($paths | length) pushed_count: $pushed skipped_count: $skipped}
+}
+
+# Filter records to paths missing from all caches and write a markdown summary
+export def "ci nix missing-paths" [
+  cache: string # Cache name for the summary table
+]: [
+  list<record> -> list<string>
+] {
+  let records = $in
+
+  # Filter to paths missing from both upstream and cachix
+  let missing = ($records | where {|r| (not $r.in_upstream) and (not $r.in_cachix) })
+  let missing_paths = ($missing | get path)
+
+  # Write summary to GITHUB_STEP_SUMMARY if available
+  let summary_file = $env.GITHUB_STEP_SUMMARY?
+  if ($summary_file | is-not-empty) {
+    let total = ($records | length)
+    let missing_count = ($missing | length)
+
+    let summary = $"### Cache Summary\n\n| Cache | Count |\n|---|---|\n| Total paths | ($total) |\n| Missing paths | ($missing_count) |\n"
+    $summary | save --append $summary_file
+    "Wrote cache summary to GITHUB_STEP_SUMMARY" | ci log info
+  }
+
+  $missing_paths
+}
