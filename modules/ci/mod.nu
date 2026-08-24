@@ -30,3 +30,6 @@ export use ./log.nu *
 
 # Re-export all cargo commands from cargo.nu
 export use ./cargo.nu *
+
+# Re-export all homebrew commands from homebrew.nu
+export use ./homebrew.nu *
