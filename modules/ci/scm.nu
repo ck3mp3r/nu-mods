@@ -396,3 +396,82 @@ export def "ci scm commit" [
     {status: "success" error: null message: $commit_message pushed: false}
   }
 }
+
+# Squash-merge a release branch into main, commit, push, and delete the branch
+export def "ci scm merge-release" [
+  version: string # Release version (e.g., "0.1.0" -> branch "release/0.1.0")
+]: [
+  nothing -> record
+] {
+  let release_branch = $"release/($version)"
+
+  # Switch to main
+  $"Switching to main" | ci log info
+  try {
+    git checkout main
+  } catch {|err|
+    $"Failed to checkout main: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to checkout main: ($err.msg)" committed: false pushed: false branch_deleted: false}
+  }
+
+  # Fetch release branch
+  $"Fetching origin/($release_branch)" | ci log info
+  try {
+    git fetch origin $release_branch
+  } catch {|err|
+    $"Failed to fetch release branch: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to fetch release branch: ($err.msg)" committed: false pushed: false branch_deleted: false}
+  }
+
+  # Squash merge
+  $"Squash merging origin/($release_branch) into main" | ci log info
+  try {
+    git merge --squash $"origin/($release_branch)"
+  } catch {|err|
+    $"Failed to squash merge: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to squash merge: ($err.msg)" committed: false pushed: false branch_deleted: false}
+  }
+
+  # Check for staged changes (git diff --cached --quiet exits 0 if clean, non-zero if changes)
+  let has_changes = try {
+    git diff --cached --quiet | ignore
+    false
+  } catch {|err|
+    true
+  }
+
+  if not $has_changes {
+    "No changes to merge, skipping commit and push" | ci log warning
+    return {status: "success" error: null committed: false pushed: false branch_deleted: false}
+  }
+
+  # Commit
+  let commit_message = $"Release ($version)"
+  $"Committing: ($commit_message)" | ci log info
+  try {
+    git commit -m $commit_message
+  } catch {|err|
+    $"Failed to commit: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to commit: ($err.msg)" committed: false pushed: false branch_deleted: false}
+  }
+
+  # Push to main
+  $"Pushing to origin main" | ci log info
+  try {
+    git push origin main
+  } catch {|err|
+    $"Failed to push to main: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to push to main: ($err.msg)" committed: true pushed: false branch_deleted: false}
+  }
+
+  # Delete remote release branch
+  $"Deleting remote branch: origin/($release_branch)" | ci log info
+  try {
+    git push origin --delete $release_branch
+  } catch {|err|
+    $"Failed to delete remote release branch: ($err.msg)" | ci log error
+    return {status: "error" error: $"Failed to delete remote release branch: ($err.msg)" committed: true pushed: true branch_deleted: false}
+  }
+
+  {status: "success" error: null committed: true pushed: true branch_deleted: true}
+}
