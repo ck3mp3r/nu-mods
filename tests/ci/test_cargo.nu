@@ -138,7 +138,7 @@ export def --env "test ci cargo update excluded crate" [] {
     cd $temp_dir
     mimic reset
     mimic register cargo {args: ['check'] returns: ""}
-    mimic register cargo {args: ['update' '--manifest-path' _] returns: ""}
+    mimic register cargo {args: ['update' '-p' 'context-frontend' '--manifest-path' _] returns: ""}
 
     let result = (ci cargo update-version "0.2.0")
     cd $original_dir

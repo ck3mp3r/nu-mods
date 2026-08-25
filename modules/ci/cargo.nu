@@ -91,13 +91,16 @@ export def "ci cargo update-version" [
         return {status: "error" error: $"Failed to save ($rel_path): ($err.msg)"}
       }
 
-      # Refresh the excluded crate's Cargo.lock if present. cargo update only
-      # resolves the dependency graph and writes the lock file — it does not
-      # compile, so it works without the WASM target installed.
+      # Refresh the excluded crate's Cargo.lock if present. Use `cargo update -p
+      # <crate>` to update ONLY the crate's own lock entry — bare `cargo update`
+      # would bump all dependencies to newer versions. `-p` only resolves the
+      # named crate's version change and does not compile, so it works without
+      # the WASM target installed.
       let lock_path = ($crate_toml_path | path dirname | path join "Cargo.lock")
       if ($lock_path | path exists) {
+        let crate_name = ($crate_toml | get -o package.name? | default "")
         try {
-          cargo update --manifest-path $crate_toml_path
+          cargo update -p $crate_name --manifest-path $crate_toml_path
           $"Updated Cargo.lock for ($rel_path)" | ci log info
           $modified_files = ($modified_files | append ($lock_path | path relative-to (pwd)))
         } catch {|err|
