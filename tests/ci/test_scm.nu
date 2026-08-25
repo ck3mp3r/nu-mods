@@ -829,6 +829,7 @@ export def --env "test ci scm merge squash with changes" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squash commit -- not updating HEAD" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
@@ -849,6 +850,7 @@ export def --env "test ci scm merge squash no changes" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 0 }
@@ -970,6 +972,7 @@ export def --env "test ci scm merge no squash" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
   mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge made by the 'ort' strategy." }
   mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
@@ -1000,6 +1003,7 @@ export def --env "test ci scm merge no-squash no message" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
   mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge branch" }
 
@@ -1017,6 +1021,7 @@ export def --env "test ci scm merge no push" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
@@ -1051,6 +1056,7 @@ export def --env "test ci scm merge push failure" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
+  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
@@ -1071,6 +1077,7 @@ export def --env "test ci scm merge custom target" [] {
   mimic reset
 
   mimic register git { args: ['checkout' 'develop'] returns: "Switched to branch 'develop'" }
+  mimic register git { args: ['pull' 'origin' 'develop'] returns: "Already up to date." }
   mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
   mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
   mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }

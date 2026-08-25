@@ -44,7 +44,7 @@ def git-branch [
 ] {
   # Check if we're in a git repository
   try {
-    git status --porcelain err> /dev/null | ignore
+    git status --porcelain err> /dev/null
   } catch {
     print "Error: Not in a git repository"
     return
@@ -121,7 +121,7 @@ def git-pr [
 ] {
   # Check if we're in a git repository
   try {
-    git status --porcelain err> /dev/null | ignore
+    git status --porcelain err> /dev/null
   } catch {
     print "Error: Not in a git repository"
     return
@@ -438,7 +438,7 @@ def create_or_update_github_pr [title: string description: string target: string
     let name = $repo.name
 
     try {
-      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($description)" | ignore
+      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($description)"
       print $"✅ Successfully updated PR #($pr_number)"
       gh pr view $pr_number --web
     } catch {|err|

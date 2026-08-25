@@ -328,11 +328,11 @@ export def "ci github pr update" [
   # Build API call
   try {
     if ($title | is-not-empty) and ($body | is-not-empty) {
-      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($body)" | ignore
+      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" -f $"body=($body)"
     } else if ($title | is-not-empty) {
-      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)" | ignore
+      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"title=($title)"
     } else if ($body | is-not-empty) {
-      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"body=($body)" | ignore
+      gh api -X PATCH $"/repos/($owner)/($name)/pulls/($pr_number)" -f $"body=($body)"
     }
 
     $"Updated PR #($pr_number)" | ci log info

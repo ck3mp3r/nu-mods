@@ -173,7 +173,7 @@ export def "ci scm branch" [
 
   # Verify we're in a git repository
   try {
-    git status --porcelain | ignore
+    git status --porcelain
   } catch {|err|
     "Not in a git repository" | ci log error
     return {status: "error" error: $"Not in a git repository: ($err.msg)" branch: null}
@@ -304,7 +304,7 @@ export def "ci scm changes" [
 ] {
   # Verify we're in a git repository
   try {
-    git status --porcelain | ignore
+    git status --porcelain
   } catch {|err|
     "Not in a git repository" | ci log error
     error make {msg: $"Not in a git repository: ($err.msg)"}
@@ -356,7 +356,7 @@ export def "ci scm commit" [
 
   # Verify we're in a git repository
   try {
-    git status --porcelain | ignore
+    git status --porcelain
   } catch {|err|
     "Not in a git repository" | ci log error
     error make {msg: $"Not in a git repository: ($err.msg)"}
@@ -460,6 +460,15 @@ export def "ci scm merge" [
     return {status: "error" error: $"Failed to checkout ($target): ($err.msg)" committed: false pushed: false}
   }
 
+  # Pull latest target branch
+  $"Pulling latest ($target)" | ci log info
+  try {
+    git pull origin $target
+  } catch {|err|
+    $"Failed to pull ($target): ($err.msg)" | ci log warning
+    # Non-fatal — proceed with local state
+  }
+
   # Fetch source branch
   $"Fetching origin/($source_branch)" | ci log info
   try {
@@ -492,7 +501,7 @@ export def "ci scm merge" [
 
     # Check for staged changes (git diff --cached --quiet exits 0 if clean, non-zero if changes)
     let has_changes = try {
-      git diff --cached --quiet | ignore
+      git diff --cached --quiet
       false
     } catch {|err|
       true
