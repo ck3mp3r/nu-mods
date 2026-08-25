@@ -725,7 +725,7 @@ export def --env "test ci scm latest-tag returns newest" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v1.2.3\nv1.0.0\nv0.9.0"
   }
 
@@ -741,7 +741,7 @@ export def --env "test ci scm latest-tag no tags" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: ""
   }
 
@@ -819,7 +819,6 @@ export def --env "test ci scm semver suffix major change" [] {
   assert ($result == "2.0.0") $"Expected '2.0.0' but got: ($result)"
 }
 
-
 # ============================================================================
 # MERGE TESTS
 # ============================================================================
@@ -828,13 +827,13 @@ export def --env "test ci scm semver suffix major change" [] {
 export def --env "test ci scm merge squash with changes" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squash commit -- not updating HEAD" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
-  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
-  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'release/0.1.0'] returns: ""}
+  mimic register git {args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squash commit -- not updating HEAD"}
+  mimic register git {args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1}
+  mimic register git {args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0"}
+  mimic register git {args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git"}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
@@ -849,11 +848,11 @@ export def --env "test ci scm merge squash with changes" [] {
 export def --env "test ci scm merge squash no changes" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 0 }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'release/0.1.0'] returns: ""}
+  mimic register git {args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits"}
+  mimic register git {args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 0}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
@@ -872,13 +871,13 @@ export def --env "test ci scm merge squash no changes" [] {
 export def --env "test ci scm branch version and push" [] {
   mimic reset
 
-  mimic register git { args: ['status' '--porcelain'] returns: "" }
-  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
-  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
-  mimic register git { args: ['pull'] returns: "Already up to date." }
-  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
-  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
-  mimic register git { args: ['push' '-u' 'origin' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['status' '--porcelain'] returns: ""}
+  mimic register git {args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main"}
+  mimic register git {args: ['switch' 'main'] returns: "Already on 'main'"}
+  mimic register git {args: ['pull'] returns: "Already up to date."}
+  mimic register git {args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128}
+  mimic register git {args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'"}
+  mimic register git {args: ['push' '-u' 'origin' 'release/0.1.0'] returns: "To github.com:user/repo.git"}
 
   let result = ('0.1.0' | ci scm branch --release --version '0.1.0' --push)
 
@@ -892,12 +891,12 @@ export def --env "test ci scm branch version and push" [] {
 export def --env "test ci scm branch release version no push" [] {
   mimic reset
 
-  mimic register git { args: ['status' '--porcelain'] returns: "" }
-  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
-  mimic register git { args: ['switch' 'main'] returns: "Already on 'main'" }
-  mimic register git { args: ['pull'] returns: "Already up to date." }
-  mimic register git { args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128 }
-  mimic register git { args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'" }
+  mimic register git {args: ['status' '--porcelain'] returns: ""}
+  mimic register git {args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main"}
+  mimic register git {args: ['switch' 'main'] returns: "Already on 'main'"}
+  mimic register git {args: ['pull'] returns: "Already up to date."}
+  mimic register git {args: ['rev-parse' '--verify' 'release/0.1.0'] returns: "" exit_code: 128}
+  mimic register git {args: ['switch' '-c' 'release/0.1.0'] returns: "Switched to a new branch 'release/0.1.0'"}
 
   let result = ('0.1.0' | ci scm branch --release --version '0.1.0')
 
@@ -915,11 +914,11 @@ export def --env "test ci scm branch release version no push" [] {
 export def --env "test ci scm commit force push" [] {
   mimic reset
 
-  mimic register git { args: ['status' '--porcelain'] returns: "" }
-  mimic register git { args: ['add' 'file.txt'] returns: "" }
-  mimic register git { args: ['commit' '-m' 'test'] returns: "[main abc123] test" }
-  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
-  mimic register git { args: ['push' '--force-with-lease' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['status' '--porcelain'] returns: ""}
+  mimic register git {args: ['add' 'file.txt'] returns: ""}
+  mimic register git {args: ['commit' '-m' 'test'] returns: "[main abc123] test"}
+  mimic register git {args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main"}
+  mimic register git {args: ['push' '--force-with-lease' 'origin' 'main'] returns: "To github.com:user/repo.git"}
 
   let result = ('file.txt' | ci scm commit -m 'test' --push --force-push)
 
@@ -933,11 +932,11 @@ export def --env "test ci scm commit force push" [] {
 export def --env "test ci scm commit push no force" [] {
   mimic reset
 
-  mimic register git { args: ['status' '--porcelain'] returns: "" }
-  mimic register git { args: ['add' 'file.txt'] returns: "" }
-  mimic register git { args: ['commit' '-m' 'test'] returns: "[main def] test" }
-  mimic register git { args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main" }
-  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['status' '--porcelain'] returns: ""}
+  mimic register git {args: ['add' 'file.txt'] returns: ""}
+  mimic register git {args: ['commit' '-m' 'test'] returns: "[main def] test"}
+  mimic register git {args: ['rev-parse' '--abbrev-ref' 'HEAD'] returns: "main"}
+  mimic register git {args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git"}
 
   let result = ('file.txt' | ci scm commit -m 'test' --push)
 
@@ -951,9 +950,9 @@ export def --env "test ci scm commit push no force" [] {
 export def --env "test ci scm commit force push without push flag" [] {
   mimic reset
 
-  mimic register git { args: ['status' '--porcelain'] returns: "" }
-  mimic register git { args: ['add' 'file.txt'] returns: "" }
-  mimic register git { args: ['commit' '-m' 'test'] returns: "[main ghi] test" }
+  mimic register git {args: ['status' '--porcelain'] returns: ""}
+  mimic register git {args: ['add' 'file.txt'] returns: ""}
+  mimic register git {args: ['commit' '-m' 'test'] returns: "[main ghi] test"}
 
   let result = ('file.txt' | ci scm commit -m 'test' --force-push)
 
@@ -971,11 +970,11 @@ export def --env "test ci scm commit force push without push flag" [] {
 export def --env "test ci scm merge no squash" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
-  mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge made by the 'ort' strategy." }
-  mimic register git { args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'feature/test'] returns: ""}
+  mimic register git {args: ['merge' 'origin/feature/test'] returns: "Merge made by the 'ort' strategy."}
+  mimic register git {args: ['push' 'origin' 'main'] returns: "To github.com:user/repo.git"}
 
   let result = (ci scm merge "feature/test" --no-squash --push)
 
@@ -1002,10 +1001,10 @@ export def --env "test ci scm merge squash missing message" [] {
 export def --env "test ci scm merge no-squash no message" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'feature/test'] returns: "" }
-  mimic register git { args: ['merge' 'origin/feature/test'] returns: "Merge branch" }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'feature/test'] returns: ""}
+  mimic register git {args: ['merge' 'origin/feature/test'] returns: "Merge branch"}
 
   let result = (ci scm merge "feature/test" --no-squash)
 
@@ -1020,12 +1019,12 @@ export def --env "test ci scm merge no-squash no message" [] {
 export def --env "test ci scm merge no push" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
-  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'release/0.1.0'] returns: ""}
+  mimic register git {args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits"}
+  mimic register git {args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1}
+  mimic register git {args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0"}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0")
 
@@ -1040,7 +1039,7 @@ export def --env "test ci scm merge no push" [] {
 export def --env "test ci scm merge checkout failure" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "fatal: not a git repository" exit_code: 128 }
+  mimic register git {args: ['checkout' 'main'] returns: "fatal: not a git repository" exit_code: 128}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
@@ -1055,13 +1054,13 @@ export def --env "test ci scm merge checkout failure" [] {
 export def --env "test ci scm merge push failure" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'main'] returns: "Switched to branch 'main'" }
-  mimic register git { args: ['pull' 'origin' 'main'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
-  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0" }
-  mimic register git { args: ['push' 'origin' 'main'] returns: "fatal: remote error" exit_code: 1 }
+  mimic register git {args: ['checkout' 'main'] returns: "Switched to branch 'main'"}
+  mimic register git {args: ['pull' 'origin' 'main'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'release/0.1.0'] returns: ""}
+  mimic register git {args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits"}
+  mimic register git {args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1}
+  mimic register git {args: ['commit' '-m' 'Release 0.1.0'] returns: "[main abc123] Release 0.1.0"}
+  mimic register git {args: ['push' 'origin' 'main'] returns: "fatal: remote error" exit_code: 1}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push)
 
@@ -1076,13 +1075,13 @@ export def --env "test ci scm merge push failure" [] {
 export def --env "test ci scm merge custom target" [] {
   mimic reset
 
-  mimic register git { args: ['checkout' 'develop'] returns: "Switched to branch 'develop'" }
-  mimic register git { args: ['pull' 'origin' 'develop'] returns: "Already up to date." }
-  mimic register git { args: ['fetch' 'origin' 'release/0.1.0'] returns: "" }
-  mimic register git { args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits" }
-  mimic register git { args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1 }
-  mimic register git { args: ['commit' '-m' 'Release 0.1.0'] returns: "[develop abc123] Release 0.1.0" }
-  mimic register git { args: ['push' 'origin' 'develop'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['checkout' 'develop'] returns: "Switched to branch 'develop'"}
+  mimic register git {args: ['pull' 'origin' 'develop'] returns: "Already up to date."}
+  mimic register git {args: ['fetch' 'origin' 'release/0.1.0'] returns: ""}
+  mimic register git {args: ['merge' '--squash' 'origin/release/0.1.0'] returns: "Squashing commit -- not creating commits"}
+  mimic register git {args: ['diff' '--cached' '--quiet'] returns: "" exit_code: 1}
+  mimic register git {args: ['commit' '-m' 'Release 0.1.0'] returns: "[develop abc123] Release 0.1.0"}
+  mimic register git {args: ['push' 'origin' 'develop'] returns: "To github.com:user/repo.git"}
 
   let result = (ci scm merge "release/0.1.0" -m "Release 0.1.0" --push --target develop)
 
@@ -1100,7 +1099,7 @@ export def --env "test ci scm merge custom target" [] {
 export def --env "test ci scm cleanup remote only" [] {
   mimic reset
 
-  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
+  mimic register git {args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git"}
 
   let result = (ci scm cleanup "release/0.1.0" --remote)
 
@@ -1115,7 +1114,7 @@ export def --env "test ci scm cleanup remote only" [] {
 export def --env "test ci scm cleanup local only" [] {
   mimic reset
 
-  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+  mimic register git {args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0"}
 
   let result = (ci scm cleanup "release/0.1.0" --local)
 
@@ -1130,8 +1129,8 @@ export def --env "test ci scm cleanup local only" [] {
 export def --env "test ci scm cleanup both" [] {
   mimic reset
 
-  mimic register git { args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git" }
-  mimic register git { args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0" }
+  mimic register git {args: ['push' 'origin' '--delete' 'release/0.1.0'] returns: "To github.com:user/repo.git"}
+  mimic register git {args: ['branch' '-D' 'release/0.1.0'] returns: "Deleted branch release/0.1.0"}
 
   let result = (ci scm cleanup "release/0.1.0" --remote --local)
 
@@ -1154,4 +1153,3 @@ export def --env "test ci scm cleanup neither" [] {
 
   mimic verify
 }
-

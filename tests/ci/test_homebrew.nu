@@ -6,12 +6,7 @@ use ../../modules/ci/homebrew.nu *
 
 # Test 1: Replace version and vX.Y.Z
 export def "test ci homebrew update version and vref" [] {
-  let formula = $"""
-class Context < Formula
-  version "0.1.0"
-  url "https://example.com/context-v0.1.0.tgz"
-end
-"""
+  let formula = $"class Context < Formula\n  version \"0.1.0\"\n  url \"https://example.com/context-v0.1.0.tgz\"\nend\n"
 
   let result = ($formula | ci homebrew update-formula "0.2.0" "context" [])
 
@@ -22,13 +17,7 @@ end
 
 # Test 2: Replace per-arch filename and hash
 export def "test ci homebrew update arch" [] {
-  let formula = $"""
-class Context < Formula
-  version "0.1.0"
-  url "https://example.com/context-0.1.0-aarch64-darwin.tgz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-end
-"""
+  let formula = $"class Context < Formula\n  version \"0.1.0\"\n  url \"https://example.com/context-0.1.0-aarch64-darwin.tgz\"\n  sha256 \"0000000000000000000000000000000000000000000000000000000000000000\"\nend\n"
 
   let result = ($formula | ci homebrew update-formula "0.2.0" "context" [{name: "aarch64-darwin" hash: "abc123"}])
 
@@ -38,15 +27,7 @@ end
 
 # Test 3: Multiple architectures
 export def "test ci homebrew update multiple arches" [] {
-  let formula = $"""
-class Context < Formula
-  version "0.1.0"
-  url "https://example.com/context-0.1.0-aarch64-darwin.tgz"
-  sha256 "1111111111111111111111111111111111111111111111111111111111111111"
-  url "https://example.com/context-0.1.0-x86_64-darwin.tgz"
-  sha256 "2222222222222222222222222222222222222222222222222222222222222222"
-end
-"""
+  let formula = $"class Context < Formula\n  version \"0.1.0\"\n  url \"https://example.com/context-0.1.0-aarch64-darwin.tgz\"\n  sha256 \"1111111111111111111111111111111111111111111111111111111111111111\"\n  url \"https://example.com/context-0.1.0-x86_64-darwin.tgz\"\n  sha256 \"2222222222222222222222222222222222222222222222222222222222222222\"\nend\n"
 
   let arches = [
     {name: "aarch64-darwin" hash: "new1"}
@@ -62,13 +43,7 @@ end
 
 # Test 4: Idempotent when already current
 export def "test ci homebrew update idempotent" [] {
-  let formula = $"""
-class Context < Formula
-  version "0.2.0"
-  url "https://example.com/context-0.2.0-aarch64-darwin.tgz"
-  sha256 "abc123"
-end
-"""
+  let formula = $"class Context < Formula\n  version \"0.2.0\"\n  url \"https://example.com/context-0.2.0-aarch64-darwin.tgz\"\n  sha256 \"abc123\"\nend\n"
 
   let result = $formula | ci homebrew update-formula "0.2.0" "context" [{name: "aarch64-darwin" hash: "abc123"}]
 

@@ -57,5 +57,56 @@ export def "ci cargo update-version" [
     return {status: "error" error: $"cargo check failed: ($err.msg)"}
   }
 
-  ["Cargo.toml" "Cargo.lock"]
+  mut modified_files = ["Cargo.toml" "Cargo.lock"]
+
+  # Bump excluded crates that have their own standalone package.version
+  # (e.g. WASM crates excluded from the workspace). These have their own
+  # Cargo.toml and Cargo.lock that must stay in sync with the release version.
+  let crate_tomls = (glob crates/*/Cargo.toml)
+  for crate_toml_path in $crate_tomls {
+    # Normalize to a relative path so the returned list matches the root
+    # files ("Cargo.toml", "Cargo.lock") and stages cleanly in git.
+    let rel_path = ($crate_toml_path | path relative-to (pwd))
+    let crate_toml = try {
+      open $crate_toml_path
+    } catch {
+      continue
+    }
+
+    # Skip crates that inherit version from the workspace
+    # (version.workspace = true parses to a record {workspace: true})
+    let version_field = ($crate_toml | get -o package.version? | default null)
+    let uses_workspace = ($version_field | describe | str starts-with "record")
+    let has_standalone_version = ($version_field | is-not-empty) and not $uses_workspace
+
+    if $has_standalone_version {
+      # Bump the version in the excluded crate's Cargo.toml
+      let updated_crate = ($crate_toml | upsert package.version $version)
+      try {
+        $updated_crate | to toml | save --force $crate_toml_path
+        $"Updated version to ($version) in ($rel_path)" | ci log info
+        $modified_files = ($modified_files | append $rel_path)
+      } catch {|err|
+        $"Failed to save ($rel_path): ($err.msg)" | ci log error
+        return {status: "error" error: $"Failed to save ($rel_path): ($err.msg)"}
+      }
+
+      # Refresh the excluded crate's Cargo.lock if present. cargo update only
+      # resolves the dependency graph and writes the lock file — it does not
+      # compile, so it works without the WASM target installed.
+      let lock_path = ($crate_toml_path | path dirname | path join "Cargo.lock")
+      if ($lock_path | path exists) {
+        try {
+          cargo update --manifest-path $crate_toml_path
+          $"Updated Cargo.lock for ($rel_path)" | ci log info
+          $modified_files = ($modified_files | append ($lock_path | path relative-to (pwd)))
+        } catch {|err|
+          $"cargo update failed for ($rel_path): ($err.msg)" | ci log error
+          return {status: "error" error: $"cargo update failed for ($rel_path): ($err.msg)"}
+        }
+      }
+    }
+  }
+
+  $modified_files
 }

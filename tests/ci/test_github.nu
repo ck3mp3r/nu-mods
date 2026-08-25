@@ -484,12 +484,12 @@ export def --env "test ci github release create with previous tag" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.1.0\nv0.0.5"
   }
 
   mimic register git {
-    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    args: ['log' 'v0.0.5..HEAD' '--format' '- %s' '--reverse']
     returns: "- feat: add feature\n- fix: fix bug"
   }
 
@@ -512,12 +512,12 @@ export def --env "test ci github release create first release" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.1.0"
   }
 
   mimic register git {
-    args: ['log' '--pretty=format:- %s' '--reverse']
+    args: ['log' '--format' '- %s' '--reverse']
     returns: "- initial commit"
   }
 
@@ -540,12 +540,12 @@ export def --env "test ci github release create failure" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.1.0"
   }
 
   mimic register git {
-    args: ['log' '--pretty=format:- %s' '--reverse']
+    args: ['log' '--format' '- %s' '--reverse']
     returns: "- initial commit"
   }
 
@@ -637,7 +637,7 @@ export def --env "test ci github release create prerelease short sha" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.0.5"
   }
 
@@ -647,7 +647,7 @@ export def --env "test ci github release create prerelease short sha" [] {
   }
 
   mimic register git {
-    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    args: ['log' 'v0.0.5..HEAD' '--format' '- %s' '--reverse']
     returns: "- feat: add feature"
   }
 
@@ -670,12 +670,12 @@ export def --env "test ci github release create prerelease custom suffix" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.0.5"
   }
 
   mimic register git {
-    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    args: ['log' 'v0.0.5..HEAD' '--format' '- %s' '--reverse']
     returns: "- feat: add feature"
   }
 
@@ -698,7 +698,7 @@ export def --env "test ci github release create prerelease git failure" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.0.5"
   }
 
@@ -722,12 +722,12 @@ export def --env "test ci github release create ignores suffix" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.0.5"
   }
 
   mimic register git {
-    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    args: ['log' 'v0.0.5..HEAD' '--format' '- %s' '--reverse']
     returns: "- feat: add feature"
   }
 
@@ -749,12 +749,12 @@ export def --env "test ci github release create target no prerelease" [] {
   mimic reset
 
   mimic register git {
-    args: ['tag' '--sort=-version:refname']
+    args: ['tag' '--sort' '-version:refname']
     returns: "v0.0.5"
   }
 
   mimic register git {
-    args: ['log' 'v0.0.5..HEAD' '--pretty=format:- %s' '--reverse']
+    args: ['log' 'v0.0.5..HEAD' '--format' '- %s' '--reverse']
     returns: "- feat: add feature"
   }
 
@@ -770,4 +770,3 @@ export def --env "test ci github release create target no prerelease" [] {
 
   mimic verify
 }
-

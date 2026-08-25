@@ -131,4 +131,3 @@ export def --env "test ci artifacts platform data with tag" [] {
     rm -rf $temp_dir
   }
 }
-

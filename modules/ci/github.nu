@@ -594,7 +594,7 @@ export def "ci github release create" [
 
   # Get all tags sorted by version to find the previous tag
   let tags = try {
-    git tag --sort=-version:refname | lines
+    git tag --sort "-version:refname" | lines
   } catch {|err|
     $"Failed to get git tags: ($err.msg)" | ci log error
     return {status: "error" error: $"Failed to get git tags: ($err.msg)" version: $version url: null}
@@ -625,9 +625,9 @@ export def "ci github release create" [
   # Generate changelog from git log
   let changelog = try {
     if ($previous_tag | is-not-empty) {
-      git log $"($previous_tag)..HEAD" --pretty=format:"- %s" --reverse
+      git log $"($previous_tag)..HEAD" --format "- %s" --reverse
     } else {
-      git log --pretty=format:"- %s" --reverse
+      git log --format "- %s" --reverse
     }
   } catch {|err|
     $"Failed to generate changelog: ($err.msg)" | ci log error
@@ -678,4 +678,3 @@ export def "ci github release upload" [
     {status: "error" error: $"Failed to upload files: ($err.msg)" tag: $tag files_uploaded: 0}
   }
 }
-

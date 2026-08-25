@@ -70,7 +70,7 @@ export def "ci scm latest-tag" []: [
   # Get all tags sorted by semantic version, take the newest
   let tags = (
     try {
-      git tag --sort=-version:refname
+      git tag --sort "-version:refname"
     } catch {|err|
       "Failed to get git tags" | ci log error
       return ""
@@ -582,5 +582,3 @@ export def "ci scm cleanup" [
     {status: "error" error: "Failed to delete branch" remote_deleted: false local_deleted: false}
   }
 }
-
-
