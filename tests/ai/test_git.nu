@@ -43,8 +43,7 @@ export def --env "test ai git pr with custom model and target" [] {
 
   mimic register agent {
     args: {type: "contains", value: "custom-model"}
-    returns: {response: "feat: test PR\n\nPR description"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git pr --model 'custom-model' --target 'develop'
@@ -90,8 +89,7 @@ export def --env "test ai git pr with prefix" [] {
 
   mimic register agent {
     args: {type: "contains", value: "gpt-4"}
-    returns: {response: "ABC-123: Add test suite\n\nAdded comprehensive tests"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git pr --model 'gpt-4' --prefix 'ABC-123'
@@ -117,8 +115,7 @@ export def --env "test ai git commit with custom model" [] {
 
   mimic register agent {
     args: {type: "contains", value: "--permissions"}
-    returns: {response: "Add new feature\n\n- Added functionality\n- Removed old code"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git commit --model 'claude-3'
@@ -148,8 +145,7 @@ export def --env "test ai git branch with description and prefix" [] {
 
   mimic register agent {
     args: {type: "contains", value: "test-model"}
-    returns: {response: "feature/add-logging"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git branch --model 'test-model' --description 'add logging support' --prefix 'JIRA-789'
@@ -180,8 +176,7 @@ export def --env "test ai git branch from current" [] {
 
   mimic register agent {
     args: {type: "contains", value: "gpt-4"}
-    returns: {response: "feature/new-feature"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git branch --model 'gpt-4' --from-current
@@ -208,8 +203,7 @@ export def --env "test ai git commit extracts branch prefix" [] {
 
   mimic register agent {
     args: {type: "contains", value: "--permissions"}
-    returns: {response: "Implement authentication"}
-    exit_code: 0
+    exit_code: 1\n    returns: "AI error"
   }
 
   ai git commit --model 'gpt-4'

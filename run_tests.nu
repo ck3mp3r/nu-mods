@@ -34,7 +34,7 @@ scope commands
       # Run each test
       $test_commands | each {|test_name|
         try {
-          "a" | nu --no-config-file -c $"source ($test_file); ($test_name)"
+          nu --no-config-file -c $"source ($test_file); ($test_name)"
           print $"✓ ($test_name)"
           {file: $test_file test: $test_name status: "pass"}
         } catch {|err|

@@ -235,12 +235,10 @@ def git-commit [
 
   let prompt = make_commit_prompt
   let tools = {
-    get_diff: {
-      description: "Get the staged git diff for generating a commit message"
-    }
+    get_diff: {|| git diff --cached }
   }
   let permissions = {
-    "get_diff": "allow"
+    get_diff: "allow"
     "read": "allow"
   }
 
