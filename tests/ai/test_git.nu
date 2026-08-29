@@ -101,7 +101,7 @@ export def --env "test ai git pr with prefix" [] {
 }
 
 # Test ai git commit - exported function
-# Validates: model parameter, tools passed to agent for diff retrieval
+# Validates: model parameter, tools and permissions passed to agent for diff retrieval
 export def --env "test ai git commit with custom model" [] {
   mimic reset
 
@@ -111,12 +111,12 @@ export def --env "test ai git commit with custom model" [] {
   }
 
   mimic register git {
-    args: ['diff' '--cached']
-    returns: "diff --git a/file.nu\n+added line\n-removed line"
+    args: ['diff' '--cached' '--name-only']
+    returns: "file.nu"
   }
 
   mimic register agent {
-    args: {type: "contains", value: "--tools"}
+    args: {type: "contains", value: "--permissions"}
     returns: {response: "Add new feature\n\n- Added functionality\n- Removed old code"}
     exit_code: 0
   }
@@ -202,12 +202,12 @@ export def --env "test ai git commit extracts branch prefix" [] {
   }
 
   mimic register git {
-    args: ['diff' '--cached']
-    returns: "diff --git a/auth.nu\n+new auth"
+    args: ['diff' '--cached' '--name-only']
+    returns: "auth.nu"
   }
 
   mimic register agent {
-    args: {type: "contains", value: "--tools"}
+    args: {type: "contains", value: "--permissions"}
     returns: {response: "Implement authentication"}
     exit_code: 0
   }
