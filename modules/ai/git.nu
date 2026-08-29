@@ -228,7 +228,7 @@ def git-commit [
   let branch = (git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
 
-  if (git diff --cached --quiet) {
+  if (git diff --cached --name-only | str trim) == "" {
     print "No changes staged!"
     return
   }
@@ -240,7 +240,8 @@ def git-commit [
     }
   }
   let permissions = {
-    get_diff: "allow"
+    "get_diff": "allow"
+    "read": "allow"
   }
 
   print "Generating commit message..."
