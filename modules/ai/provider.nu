@@ -12,9 +12,11 @@
 export def execute [
   prompt: string
   model: string
+  --tools: record = {}
+  --permissions: record = {}
 ]: nothing -> string {
   let result = try {
-    $prompt | agent --model $model | get response
+    $prompt | agent --model $model --quiet --tools $tools --permissions $permissions | get response
   } catch {|err|
     error make {
       msg: "AI provider error"
@@ -26,7 +28,7 @@ export def execute [
   }
 
   # Clean up the response by removing thinking tags if present
-  let cleaned = ($result | str trim | split row "</think>" | last | str trim)
+  let cleaned = ($result | str trim | split row "</thinking>" | last | str trim)
 
   # Check if result is empty
   if $cleaned == "" {
