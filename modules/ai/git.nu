@@ -227,19 +227,26 @@ def git-commit [
 ] {
   let branch = (git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
-  let diff = (git diff --cached | str trim)
 
-  if $diff == "" {
+  if (git diff --cached --quiet) {
     print "No changes staged!"
     return
   }
 
-  let prompt = make_commit_prompt $diff
+  let prompt = make_commit_prompt
+  let tools = {
+    get_diff: {
+      description: "Get the staged git diff for generating a commit message"
+    }
+  }
+  let permissions = {
+    get_diff: "allow"
+  }
 
   print "Generating commit message..."
 
   mut message = try {
-    provider execute $prompt $model
+    provider execute $prompt $model --tools $tools --permissions $permissions
   } catch {|err|
     print $"Error generating commit message: ($err.msg)"
     return
@@ -271,11 +278,12 @@ def git-commit [
   }
 }
 
-def make_commit_prompt [diff: string] {
-  $"
-You are an expert in writing Git commit messages following Conventional Commits specification.
+def make_commit_prompt [] {
+  $"You are an expert in writing Git commit messages following Conventional Commits specification.
 
-Your task is to generate a commit message based on the provided diff. The commit message must:
+Your task is to generate a commit message based on the staged diff. Use the get_diff tool to retrieve the staged diff.
+
+The commit message must:
 1. Use a clear, descriptive title in imperative mood \(50 characters max\)
 2. Include bullet points for significant changes only
 3. Use technical, precise language
@@ -286,15 +294,13 @@ Important:
 - Return just the commit message, no additional text or explanation
 - Do not include labels like 'Title:' or 'Commit Message:'
 - Do not use markdown code blocks
-- Analyze the entire diff and capture only major changes
+- Call the get_diff tool first, then analyze the diff and capture only major changes
 
 Output Format:
-Concise title
+Conise title
 
 - Key change 1
-- Key change 2
-
-Diff:($diff)"
+- Key change 2"
 }
 
 def commit_with_message [message: string] {

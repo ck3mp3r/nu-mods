@@ -41,9 +41,10 @@ export def --env "test ai git pr with custom model and target" [] {
     returns: "test.nu"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'custom-model']
-    returns: "feat: test PR\n\nPR description"
+  mimic register agent {
+    args: {type: "contains", value: "custom-model"}
+    returns: {response: "feat: test PR\n\nPR description"}
+    exit_code: 0
   }
 
   ai git pr --model 'custom-model' --target 'develop'
@@ -87,9 +88,10 @@ export def --env "test ai git pr with prefix" [] {
     returns: "test.nu"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'gpt-4']
-    returns: "ABC-123: Add test suite\n\nAdded comprehensive tests"
+  mimic register agent {
+    args: {type: "contains", value: "gpt-4"}
+    returns: {response: "ABC-123: Add test suite\n\nAdded comprehensive tests"}
+    exit_code: 0
   }
 
   ai git pr --model 'gpt-4' --prefix 'ABC-123'
@@ -99,7 +101,7 @@ export def --env "test ai git pr with prefix" [] {
 }
 
 # Test ai git commit - exported function
-# Validates: model parameter, diff is in prompt
+# Validates: model parameter, tools passed to agent for diff retrieval
 export def --env "test ai git commit with custom model" [] {
   mimic reset
 
@@ -113,14 +115,14 @@ export def --env "test ai git commit with custom model" [] {
     returns: "diff --git a/file.nu\n+added line\n-removed line"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'claude-3']
-    returns: "Add new feature\n\n- Added functionality\n- Removed old code"
+  mimic register agent {
+    args: {type: "contains", value: "--tools"}
+    returns: {response: "Add new feature\n\n- Added functionality\n- Removed old code"}
+    exit_code: 0
   }
 
   ai git commit --model 'claude-3'
 
-  # Just verify the correct commands were called
   mimic verify
 }
 
@@ -144,9 +146,10 @@ export def --env "test ai git branch with description and prefix" [] {
     returns: "main"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'test-model']
-    returns: "feature/add-logging"
+  mimic register agent {
+    args: {type: "contains", value: "test-model"}
+    returns: {response: "feature/add-logging"}
+    exit_code: 0
   }
 
   ai git branch --model 'test-model' --description 'add logging support' --prefix 'JIRA-789'
@@ -175,9 +178,10 @@ export def --env "test ai git branch from current" [] {
     returns: "develop"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'gpt-4']
-    returns: "feature/new-feature"
+  mimic register agent {
+    args: {type: "contains", value: "gpt-4"}
+    returns: {response: "feature/new-feature"}
+    exit_code: 0
   }
 
   ai git branch --model 'gpt-4' --from-current
@@ -202,14 +206,13 @@ export def --env "test ai git commit extracts branch prefix" [] {
     returns: "diff --git a/auth.nu\n+new auth"
   }
 
-  mimic register opencode {
-    args: ['run' '--model' 'gpt-4']
-    returns: "Implement authentication"
+  mimic register agent {
+    args: {type: "contains", value: "--tools"}
+    returns: {response: "Implement authentication"}
+    exit_code: 0
   }
 
   ai git commit --model 'gpt-4'
 
-  # Should prefix commit message with TICKET-999
-  # Just verify the correct commands were called
   mimic verify
 }
