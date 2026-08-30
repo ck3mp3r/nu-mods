@@ -1,9 +1,6 @@
 use ../common/help show-help
 use provider.nu
 
-# Default AI model for git operations
-const DEFAULT_MODEL = "ollama-cloud/deepseek-v4-flash"
-
 # AI-powered git commands - show help
 export def "ai git" [] {
   show-help "ai git"
@@ -11,37 +8,41 @@ export def "ai git" [] {
 
 # Create a new git branch with an AI-generated name based on current changes or user input
 export def "ai git branch" [
-  --model (-m): string = $DEFAULT_MODEL
+  --model (-m): string
   --description (-d): string
   --prefix (-p): string
   --from-current
 ] {
-  git-branch $model ($description | default "") ($prefix | default "") $from_current
+  git-branch $model $description $prefix $from_current
 }
 
 # Create a pull request with AI-generated title and description based on branch changes
 export def "ai git pr" [
-  --model (-m): string = $DEFAULT_MODEL
+  --model (-m): string
   --prefix (-p): string
   --target (-t): string = "main"
 ] {
-  git-pr $model ($prefix | default "") $target
+  git-pr $model $prefix $target
 }
 
 # Generate and apply an AI-written commit message based on staged changes
 export def "ai git commit" [
-  --model (-m): string = $DEFAULT_MODEL
+  --model (-m): string
 ] {
   git-commit $model
 }
 
 # Create a new git branch with an AI-generated name based on current changes or user input
 def git-branch [
-  model: string # AI model to use for branch name generation
-  description: string # Optional description of what you're working on
-  prefix: string # Optional prefix for branch name (e.g., ABC-123)
-  from_current: bool # Branch from current branch instead of main
+  model?: string # Optional AI model to use for branch name generation
+  description?: string # Optional description of what you're working on
+  prefix?: string # Optional prefix for branch name (e.g., ABC-123)
+  from_current?: bool # Branch from current branch instead of main
 ] {
+  let model = ($model | default null)
+  let description = ($description | default "")
+  let prefix = ($prefix | default "")
+  let from_current = ($from_current | default false)
   # Check if we're in a git repository
   try {
     git status --porcelain err> /dev/null
@@ -115,10 +116,13 @@ def git-branch [
 
 # Create a pull request with AI-generated title and description based on branch changes
 def git-pr [
-  model: string # AI model to use for PR generation
-  prefix: string # Optional prefix for PR title (e.g., ABC-123)
-  target: string # Target branch for the PR
+  model?: string # Optional AI model to use for PR generation
+  prefix?: string # Optional prefix for PR title (e.g., ABC-123)
+  target?: string # Target branch for the PR
 ] {
+  let model = ($model | default null)
+  let prefix = ($prefix | default "")
+  let target = ($target | default "main")
   # Check if we're in a git repository
   try {
     git status --porcelain err> /dev/null
@@ -223,8 +227,9 @@ def git-pr [
 
 # Generate and apply an AI-written commit message based on staged changes
 def git-commit [
-  model: string # AI model to use for commit message generation
+  model?: string # Optional AI model to use for commit message generation
 ] {
+  let model = ($model | default null)
   let branch = (git rev-parse --abbrev-ref HEAD | str trim)
   let prefix = ($branch | parse -r '(?P<id>[A-Za-z]+-[0-9]+)' | get id.0? | default "")
 
