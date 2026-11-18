@@ -353,8 +353,31 @@ export def "ci nix closure" []: [
         | where {|line| ($line | str trim | is-not-empty) }
       )
 
-      $"Got ($closure | length) paths in closure for ($path)" | ci log info
-      $closure
+      # Build closure: derivation inputs and intermediate outputs
+      let build_closure = (
+        try {
+          let deriver = (nix-store --query --deriver $path | lines | first | str trim)
+
+          # Never pass unknown-deriver to nix-store -qR: it resolves as a
+          # relative path against the CWD and fails.
+          if ($deriver == "unknown-deriver") {
+            $"No recorded deriver for ($path), using runtime closure only" | ci log info
+            []
+          } else {
+            nix-store -qR --include-outputs $deriver
+            | lines
+            | where {|line| ($line | str trim | is-not-empty) }
+          }
+        } catch {|err|
+          $"Failed to get build closure for ($path): ($err.msg)" | ci log info
+          []
+        }
+      )
+
+      let merged = ($closure ++ $build_closure | uniq)
+
+      $"Got ($merged | length) paths in closure for ($path) - runtime: ($closure | length), build: ($build_closure | length)" | ci log info
+      $merged
     } catch {|err|
       $"Failed to get closure for ($path): ($err.msg)" | ci log error
       []
