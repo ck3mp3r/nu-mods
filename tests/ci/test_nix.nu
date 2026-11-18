@@ -291,6 +291,36 @@ export def --env "test ci nix closure dedups overlapping closures" [] {
   mimic verify
 }
 
+# Test: multi-line mocked build closure is read back from the temp file
+export def --env "test ci nix closure reads multi-line build closure" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/multi-pkg']
+    returns: "/nix/store/multi-pkg"
+  }
+
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/multi-pkg']
+    returns: "/nix/store/multi-pkg.drv"
+  }
+
+  mimic register nix-store {
+    args: ['-qR' '--include-outputs' '/nix/store/multi-pkg.drv']
+    returns: "/nix/store/multi-pkg\n/nix/store/vendor-a\n/nix/store/vendor-b\n/nix/store/toolchain-c\n/nix/store/crate-src-d\n/nix/store/multi-pkg.drv"
+  }
+
+  let result = ('/nix/store/multi-pkg' | ci nix closure)
+
+  assert ("/nix/store/vendor-a" in $result) $"Expected vendor-a in closure: got ($result)"
+  assert ("/nix/store/vendor-b" in $result) $"Expected vendor-b in closure: got ($result)"
+  assert ("/nix/store/toolchain-c" in $result) $"Expected toolchain-c in closure: got ($result)"
+  assert ("/nix/store/crate-src-d" in $result) $"Expected crate-src-d in closure: got ($result)"
+  assert (($result | length) == 6) $"Expected 6 paths in closure but got: ($result | length)"
+
+  mimic verify
+}
+
 # ============================================================================
 # CACHE TESTS
 # ============================================================================
