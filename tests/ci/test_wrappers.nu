@@ -9,6 +9,11 @@ export def --env --wrapped nix [...args] {
   mimic call 'nix' $args
 }
 
+# Wrapped nix-store command - just calls mock, errors bubble up via try/catch
+export def --env --wrapped nix-store [...args] {
+  mimic call 'nix-store' $args
+}
+
 # Wrapped cachix command - just calls mock, errors bubble up via try/catch
 export def --env --wrapped cachix [...args] {
   mimic call 'cachix' $args

@@ -211,6 +211,86 @@ export def --env "test ci nix closure empty input" [] {
   assert (($result | length) == 0) $"Expected empty result"
 }
 
+# Test: closure unions the build closure with the runtime closure
+export def --env "test ci nix closure unions build closure" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/abc-pkg']
+    returns: "/nix/store/abc-pkg\n/nix/store/dep1"
+  }
+
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/abc-pkg']
+    returns: "/nix/store/abc-pkg.drv"
+  }
+
+  mimic register nix-store {
+    args: ['-qR' '--include-outputs' '/nix/store/abc-pkg.drv']
+    returns: "/nix/store/abc-pkg\n/nix/store/dep1\n/nix/store/vendor\n/nix/store/toolchain\n/nix/store/abc-pkg.drv"
+  }
+
+  let result = ('/nix/store/abc-pkg' | ci nix closure)
+
+  assert ("/nix/store/vendor" in $result) $"Expected vendor in union closure: got ($result)"
+  assert ("/nix/store/toolchain" in $result) $"Expected toolchain in union closure: got ($result)"
+  assert ("/nix/store/abc-pkg.drv" in $result) $"Expected the derivation in union closure: got ($result)"
+  assert (($result | length) == 5) $"Expected 5 paths in union closure but got: ($result | length)"
+  assert (($result | uniq | length) == ($result | length)) $"Expected unique paths only: got ($result)"
+
+  mimic verify
+}
+
+# Test: unknown-deriver falls back to the runtime closure
+export def --env "test ci nix closure unknown deriver fallback" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/abc-pkg']
+    returns: "/nix/store/abc-pkg\n/nix/store/dep1"
+  }
+
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/abc-pkg']
+    returns: "unknown-deriver"
+  }
+
+  let result = ('/nix/store/abc-pkg' | ci nix closure)
+
+  assert (($result | length) == 2) $"Expected runtime closure only but got: ($result)"
+  assert ($result == ["/nix/store/abc-pkg" "/nix/store/dep1"]) $"Expected runtime closure unchanged: got ($result)"
+
+  mimic verify
+}
+
+# Test: overlapping runtime and build closures are deduplicated
+export def --env "test ci nix closure dedups overlapping closures" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/dup-pkg']
+    returns: "/nix/store/dup-pkg\n/nix/store/dep1\n/nix/store/dep2"
+  }
+
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/dup-pkg']
+    returns: "/nix/store/dup-pkg.drv"
+  }
+
+  mimic register nix-store {
+    args: ['-qR' '--include-outputs' '/nix/store/dup-pkg.drv']
+    returns: "/nix/store/dup-pkg\n/nix/store/dep1\n/nix/store/dep2\n/nix/store/dep1\n/nix/store/dup-pkg.drv"
+  }
+
+  let result = ('/nix/store/dup-pkg' | ci nix closure)
+
+  assert (($result | length) == 4) $"Expected 4 unique paths but got: ($result | length)"
+  assert (($result | uniq | length) == ($result | length)) $"Expected unique paths only: got ($result)"
+  assert ($result == ["/nix/store/dup-pkg" "/nix/store/dep1" "/nix/store/dep2" "/nix/store/dup-pkg.drv"]) $"Unexpected union result: got ($result)"
+
+  mimic verify
+}
+
 # ============================================================================
 # CACHE TESTS
 # ============================================================================
