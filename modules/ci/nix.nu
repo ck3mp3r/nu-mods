@@ -372,43 +372,49 @@ export def "ci nix closure" []: [
   $paths | each {|path|
     $"Getting closure for path: ($path)" | ci log info
 
-    try {
-      # Use nix path-info --recursive to get all dependencies
-      let closure = (
-        nix path-info --recursive $path
-        | lines
-        | where {|line| ($line | str trim | is-not-empty) }
-      )
+    # Capture long nix output to temp files: pipe capture inside each+try
+    # deadlocks once the child writes past the pipe buffer.
+    let tmp_runtime = (mktemp)
+    let tmp_build = (mktemp)
 
-      # Build closure: derivation inputs and intermediate outputs
-      let build_closure = (
-        try {
-          let deriver = (nix-store --query --deriver $path | lines | first | str trim)
+    let result = (
+      try {
+        # Use nix path-info --recursive to get all dependencies
+        nix path-info --recursive $path o> $tmp_runtime
+        let closure = (open $tmp_runtime | lines | where {|line| ($line | str trim | is-not-empty) })
 
-          # Never pass unknown-deriver to nix-store -qR: it resolves as a
-          # relative path against the CWD and fails.
-          if ($deriver == "unknown-deriver") {
-            $"No recorded deriver for ($path), using runtime closure only" | ci log info
+        # Build closure: derivation inputs and intermediate outputs
+        let build_closure = (
+          try {
+            let deriver = (nix-store --query --deriver $path | lines | first | str trim)
+
+            # Never pass unknown-deriver to nix-store -qR: it resolves as a
+            # relative path against the CWD and fails.
+            if ($deriver == "unknown-deriver") {
+              $"No recorded deriver for ($path), using runtime closure only" | ci log info
+              []
+            } else {
+              nix-store -qR --include-outputs $deriver o> $tmp_build
+              open $tmp_build | lines | where {|line| ($line | str trim | is-not-empty) }
+            }
+          } catch {|err|
+            $"Failed to get build closure for ($path): ($err.msg)" | ci log info
             []
-          } else {
-            nix-store -qR --include-outputs $deriver
-            | lines
-            | where {|line| ($line | str trim | is-not-empty) }
           }
-        } catch {|err|
-          $"Failed to get build closure for ($path): ($err.msg)" | ci log info
-          []
-        }
-      )
+        )
 
-      let merged = ($closure ++ $build_closure | uniq)
+        let merged = ($closure ++ $build_closure | uniq)
 
-      $"Got ($merged | length) paths in closure for ($path) - runtime: ($closure | length), build: ($build_closure | length)" | ci log info
-      $merged
-    } catch {|err|
-      $"Failed to get closure for ($path): ($err.msg)" | ci log error
-      []
-    }
+        $"Got ($merged | length) paths in closure for ($path) - runtime: ($closure | length), build: ($build_closure | length)" | ci log info
+        $merged
+      } catch {|err|
+        $"Failed to get closure for ($path): ($err.msg)" | ci log error
+        []
+      }
+    )
+
+    rm -f $tmp_runtime $tmp_build
+    $result
   } | flatten | uniq
 }
 
