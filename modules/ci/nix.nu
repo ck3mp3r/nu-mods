@@ -626,6 +626,17 @@ def push-error-tail [failure: any, lines: list<string>] {
   }
 }
 
+# Exit code of a push attempt: 0 on success, never 0 on failure
+def push-exit-code [failure: any, last_exit_code: int] {
+  if ($failure == null) {
+    0
+  } else if $last_exit_code == 0 {
+    1
+  } else {
+    $last_exit_code
+  }
+}
+
 # Run one push invocation and parse the drained streams into an uploaded set
 def push-batch [cache: string, batch: list<string>] {
   let out_log = (mktemp)
@@ -645,6 +656,9 @@ def push-batch [cache: string, batch: list<string>] {
     }
   )
 
+  # Read the code before any later external resets it
+  let last_exit_code = ($env.LAST_EXIT_CODE? | default "1" | into int)
+
   let lines = ((drain-lines $out_log) ++ (drain-lines $err_log))
   rm -f $out_log $err_log
 
@@ -652,6 +666,7 @@ def push-batch [cache: string, batch: list<string>] {
 
   {
     ok: ($failure == null)
+    exit_code: (push-exit-code $failure $last_exit_code)
     uploaded: $uploaded
     error: (push-error-tail $failure $lines)
   }
@@ -660,6 +675,7 @@ def push-batch [cache: string, batch: list<string>] {
 # Push every path in serial batches with one retry per failed batch
 # Skipped rows are the complement of the uploaded set in a successful batch
 # Failed rows are the complement of the uploaded set after the retry also fails
+# Every batch logs index/total, argv size, exit code and the parsed row counts
 def push-batches [cache: string, paths: list<string>] {
   let pushable = (
     $paths
@@ -668,14 +684,22 @@ def push-batches [cache: string, paths: list<string>] {
     | sort
   )
 
+  let batches = (batch-plan $pushable (200 * 1024))
+  let total = ($batches | length)
+
   mut rows = []
   mut ok = true
 
-  for batch in (batch-plan $pushable (200 * 1024)) {
+  for entry in ($batches | enumerate) {
+    let index = ($entry.index + 1)
+    let batch = $entry.item
+    let argv_kb = (($batch | each {|path| ($path | str length) + 1 } | math sum) / 1024 | math round)
+
     mut pushed = (push-batch $cache $batch)
 
     if not $pushed.ok {
-      $"Batch of ($batch | length) paths failed, retrying once" | ci log warning
+      $"Batch ($index)/($total): push failed, exit code ($pushed.exit_code), retrying once" | ci log warning | ignore
+      $"Batch ($index)/($total) stderr: ($pushed.error)" | ci log warning | ignore
       $pushed = (push-batch $cache $batch)
     }
 
@@ -696,6 +720,18 @@ def push-batches [cache: string, paths: list<string>] {
         }
       }
     )
+
+    let uploaded_count = ($batch_rows | where status == "uploaded" | length)
+    let skipped_count = ($batch_rows | where status == "skipped" | length)
+    let failed_count = ($batch_rows | where status == "failed" | length)
+    let outcome = $"Batch ($index)/($total): ($batch | length) paths, ~($argv_kb) KB argv, exit ($push.exit_code), uploaded ($uploaded_count), skipped ($skipped_count), failed ($failed_count)"
+
+    if $push.ok {
+      $outcome | ci log info | ignore
+    } else {
+      $outcome | ci log error | ignore
+      $"Batch ($index)/($total) stderr: ($push.error)" | ci log error | ignore
+    }
 
     $rows = ($rows | append $batch_rows)
   }

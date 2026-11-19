@@ -801,6 +801,37 @@ export def "test ci nix publish chunks by argv budget" [] {
   }
 }
 
+# Test: every batch logs its outcome line, a failed batch also logs the stderr tail
+export def "test ci nix publish logs batch outcome" [] {
+  let script = '
+def --wrapped nix [...args] { "/nix/store/aaa-pkg\n/nix/store/bbb-pkg" }
+def --wrapped nix-store [...args] { "unknown-deriver" }
+use modules/ci/nix.nu *
+[{path: "/nix/store/aaa-pkg" status: "success"}] | ci nix publish mycache | where status == "uploaded" | length
+'
+  let ok_fixture = (fake-cachix-fixture)
+  let fail_fixture = (fake-cachix-fixture)
+
+  try {
+    let ok_run = (run-publish-script $ok_fixture "ok" $script)
+    let ok_log = ($ok_run.stderr | ansi strip)
+
+    assert ($ok_run.exit_code == 0) $"Expected exit 0, got ($ok_run.exit_code): ($ok_log | str trim)"
+    assert (($ok_run.stdout | str trim) == "2") $"Expected 2 uploaded rows, got: ($ok_run.stdout | str trim)"
+    assert (($ok_log | str contains "Batch 1/1: 2 paths, ~0 KB argv, exit 0, uploaded 2, skipped 0, failed 0")) $"Expected the batch outcome line, got: ($ok_log)"
+
+    let fail_run = (run-publish-script $fail_fixture "always-fail" $script)
+    let fail_log = ($fail_run.stderr | ansi strip)
+
+    assert ($fail_run.exit_code == 1) $"Expected exit 1, got ($fail_run.exit_code): ($fail_log | str trim)"
+    assert (($fail_log | str contains "Batch 1/1: 2 paths, ~0 KB argv, exit 1, uploaded 0, skipped 0, failed 2")) $"Expected the failed batch outcome line, got: ($fail_log)"
+    assert (($fail_log | str contains "error: HTTP 413 payload too large")) $"Expected the stderr tail, got: ($fail_log)"
+  } finally {
+    rm -rf $ok_fixture.dir
+    rm -rf $fail_fixture.dir
+  }
+}
+
 # Test: dry-run returns no rows and spawns no push
 export def --env "test ci nix publish dry-run" [] {
   mimic reset
