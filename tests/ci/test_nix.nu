@@ -628,114 +628,296 @@ use modules/ci/nix.nu *
 # PUBLISH TESTS
 # ============================================================================
 
-# Test: publish builds, gets closure, pushes missing paths
-export def --env "test ci nix publish all" [] {
+# Test: publish consumes build rows and returns one honest row per closure path
+export def --env "test ci nix publish honest rows" [] {
   mimic reset
 
   mimic register nix {
-    args: ['build' '.#myapp' '--json' '--no-link']
-    returns: ""
+    args: ['path-info' '--recursive' '/nix/store/app']
+    returns: "/nix/store/app\n/nix/store/dep1\n/nix/store/app.drv"
   }
 
-  mimic register nix {
-    args: ['path-info' '--recursive' '.#myapp']
-    returns: "/nix/store/a\n/nix/store/b\n/nix/store/c"
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/app']
+    returns: "unknown-deriver"
   }
 
-  # path a in upstream
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/a']
-    returns: "/nix/store/a"
-  }
-
-  # path b in upstream
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/b']
-    returns: "/nix/store/b"
-  }
-
-  # path c not in upstream
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/c']
-    returns: "error: path not found"
-    exit_code: 1
-  }
-
-  # path c not in cachix either
-  mimic register nix {
-    args: ['path-info' '--store' 'https://mycache.cachix.org' '/nix/store/c']
-    returns: "error: path not found"
-    exit_code: 1
-  }
-
-  # push path c
+  # Exact argv proves the .drv is dropped before the push
   mimic register cachix {
-    args: ['push' 'mycache' '/nix/store/c']
-    returns: ""
+    args: ['push' 'mycache' '/nix/store/app' '/nix/store/dep1']
+    returns: "Pushing /nix/store/app (1 KiB)\nAll done."
+    exit_code: 0
   }
 
-  let result = (ci nix publish mycache --flake '.#myapp')
+  let result = (
+    [{flake: "." package: "app" system: "x86_64-linux" path: "/nix/store/app" status: "success" error: null}]
+    | ci nix publish mycache
+  )
 
-  assert ($result.status == "success") $"Expected success but got: ($result.status)"
-  assert ($result.pushed_count == 1) $"Expected 1 pushed but got: ($result.pushed_count)"
-  assert ($result.skipped_count == 2) $"Expected 2 skipped but got: ($result.skipped_count)"
-  assert ($result.total_paths == 3) $"Expected 3 total paths"
+  assert (($result | length) == 2) $"Expected 2 rows but got: ($result)"
+  assert (($result | first | columns | sort) == ["error" "path" "status"]) $"Expected only path/status/error fields: got ($result)"
+  assert (($result | where path == "/nix/store/app" | first | get status) == "uploaded") $"Expected app uploaded: got ($result)"
+  assert (($result | where path == "/nix/store/dep1" | first | get status) == "skipped") $"Expected dep1 skipped: got ($result)"
+  assert (($result | where error != null | length) == 0) $"Expected null errors: got ($result)"
 
   mimic verify
 }
 
-# Test: publish build failure returns error
-export def --env "test ci nix publish build failure" [] {
+# Test: duplicates, derivations and unsorted closure order are normalised
+export def --env "test ci nix publish dedups sorts drops derivations" [] {
   mimic reset
 
   mimic register nix {
-    args: ['build' '.#myapp' '--json' '--no-link']
-    returns: "error: build failed"
-    exit_code: 1
+    args: ['path-info' '--recursive' '/nix/store/z-app']
+    returns: "/nix/store/z-app\n/nix/store/a-dep\n/nix/store/z-app\n/nix/store/a-dep.drv\n/nix/store/m-dep"
   }
 
-  let result = (ci nix publish mycache --flake '.#myapp')
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/z-app']
+    returns: "unknown-deriver"
+  }
 
-  assert ($result.status == "error") $"Expected error status"
-  assert ($result.pushed_count == 0) $"Expected 0 pushed"
-  assert ($result.skipped_count == 0) $"Expected 0 skipped"
+  # The exact sorted argv proves dedupe + derivation drop + deterministic sort
+  mimic register cachix {
+    args: ['push' 'mycache' '/nix/store/a-dep' '/nix/store/m-dep' '/nix/store/z-app']
+    returns: "Nothing to push - all store paths are already on Cachix."
+    exit_code: 0
+  }
+
+  let result = ([{path: "/nix/store/z-app" status: "success"}] | ci nix publish mycache)
+
+  assert (($result | length) == 3) $"Expected 3 rows but got: ($result)"
+  assert (($result | where {|row| $row.path | str ends-with '.drv'} | length) == 0) $"Expected no derivation rows: got ($result)"
+  assert (($result | get path) == ["/nix/store/a-dep" "/nix/store/m-dep" "/nix/store/z-app"]) $"Expected sorted paths: got ($result)"
 
   mimic verify
 }
 
-# Test: publish all paths already upstream - no cachix push
-export def --env "test ci nix publish all cached" [] {
+# Fake cachix for the engine tests: logs every call and speaks the real grammar
+def fake-cachix-fixture [] {
+  let dir = (mktemp -d)
+  let bin = ($dir | path join "bin")
+  let fake = ($bin | path join "cachix")
+
+  mkdir $bin
+
+  [
+    '#!/usr/bin/env nu'
+    'def main [...args] {'
+    '  let log = $env.FAKE_CACHIX_LOG'
+    '  (($args | str join " ") + (char nl)) | save --append $log'
+    '  let attempts = (open $log | lines | where {|line| $line | str starts-with "push " } | length)'
+    '  let mode = ($env.FAKE_CACHIX_MODE? | default "ok")'
+    '  if ($mode == "always-fail") or (($mode == "fail-first") and ($attempts <= 1)) {'
+    '    print -e "error: HTTP 413 payload too large"'
+    '    exit 1'
+    '  }'
+    '  $args | skip 2 | each {|path| print -e ("Pushing " + $path + " (1 KiB)") }'
+    '}'
+  ] | str join (char nl) | save --force $fake
+
+  ^chmod +x $fake
+
+  {dir: $dir bin: $bin log: ($dir | path join "calls.log")}
+}
+
+# Run a publish script in a child nu with the fake cachix first on PATH
+def run-publish-script [fixture: record, mode: string, script: string] {
+  with-env {
+    PATH: (($env.PATH | prepend $fixture.bin) | str join (char esep))
+    FAKE_CACHIX_LOG: $fixture.log
+    FAKE_CACHIX_MODE: $mode
+  } {
+    ^nu --no-config-file -c $script | complete
+  }
+}
+
+# Test: a failed batch is retried once with the identical argv
+export def "test ci nix publish retries failed batch" [] {
+  let fixture = (fake-cachix-fixture)
+  let script = '
+def --wrapped nix [...args] { "/nix/store/bad" }
+def --wrapped nix-store [...args] { "unknown-deriver" }
+use modules/ci/nix.nu *
+[{path: "/nix/store/bad" status: "success"}] | ci nix publish mycache | get status | to json -r
+'
+
+  try {
+    let result = (run-publish-script $fixture "fail-first" $script)
+
+    assert ($result.exit_code == 0) $"Expected exit 0 after the retry, got ($result.exit_code): ($result.stderr | str trim)"
+    assert (($result.stdout | str trim) == '["uploaded"]') $"Expected the retried path uploaded, got: ($result.stdout | str trim)"
+    assert ((open $fixture.log | lines | length) == 2) $"Expected two push attempts, got: (open $fixture.log | lines)"
+  } finally {
+    rm -rf $fixture.dir
+  }
+}
+
+# Test: publish exits 1 once the retry also fails and logs every failed path
+export def "test ci nix publish fails after retry" [] {
+  let fixture = (fake-cachix-fixture)
+  let script = '
+def --wrapped nix [...args] { "/nix/store/bad" }
+def --wrapped nix-store [...args] { "unknown-deriver" }
+use modules/ci/nix.nu *
+[{path: "/nix/store/bad" status: "success"}] | ci nix publish mycache | length
+'
+
+  try {
+    let result = (run-publish-script $fixture "always-fail" $script)
+
+    assert ($result.exit_code == 1) $"Expected exit 1, got ($result.exit_code): ($result.stderr | str trim)"
+    assert ((open $fixture.log | lines | length) == 2) $"Expected exactly one retry, got: (open $fixture.log | lines)"
+    assert (($result.stderr | str contains "/nix/store/bad")) $"Expected the failed path in the log: ($result.stderr)"
+    assert (($result.stderr | str contains "payload too large")) $"Expected the push error in the log: ($result.stderr)"
+  } finally {
+    rm -rf $fixture.dir
+  }
+}
+
+# Test: the push set is split into argv-budget batches
+export def "test ci nix publish chunks by argv budget" [] {
+  let fixture = (fake-cachix-fixture)
+  let script = [
+    'def --wrapped nix [...args] {'
+    '  1..2400 | each {|i| $"/nix/store/($i | into string | fill -a r -w 6 -c 0)-package-with-a-long-name-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } | str join (char nl)'
+    '}'
+    'def --wrapped nix-store [...args] { "unknown-deriver" }'
+    'use modules/ci/nix.nu *'
+    '[{path: "/nix/store/000001-package-with-a-long-name-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" status: "success"}] | ci nix publish mycache | length'
+  ] | str join (char nl)
+
+  try {
+    let result = (run-publish-script $fixture "ok" $script)
+    let calls = (open $fixture.log | lines | where {|line| $line | str starts-with "push " })
+    let pushed = ($calls | each {|call| $call | split row " " | skip 2 } | flatten)
+
+    assert ($result.exit_code == 0) $"Expected exit 0, got ($result.exit_code): ($result.stderr | str trim)"
+    assert (($calls | length) > 1) $"Expected more than one batch, got: ($calls | length)"
+    assert (($pushed | uniq | length) == 2400) $"Expected 2400 distinct paths across batches, got: ($pushed | uniq | length)"
+    assert (($pushed | length) == 2400) $"Expected no path pushed twice, got: ($pushed | length)"
+  } finally {
+    rm -rf $fixture.dir
+  }
+}
+
+# Test: every batch logs its outcome line, a failed batch also logs the stderr tail
+export def "test ci nix publish logs batch outcome" [] {
+  let script = '
+def --wrapped nix [...args] { "/nix/store/aaa-pkg\n/nix/store/bbb-pkg" }
+def --wrapped nix-store [...args] { "unknown-deriver" }
+use modules/ci/nix.nu *
+[{path: "/nix/store/aaa-pkg" status: "success"}] | ci nix publish mycache | where status == "uploaded" | length
+'
+  let ok_fixture = (fake-cachix-fixture)
+  let fail_fixture = (fake-cachix-fixture)
+
+  try {
+    let ok_run = (run-publish-script $ok_fixture "ok" $script)
+    let ok_log = ($ok_run.stderr | ansi strip)
+
+    assert ($ok_run.exit_code == 0) $"Expected exit 0, got ($ok_run.exit_code): ($ok_log | str trim)"
+    assert (($ok_run.stdout | str trim) == "2") $"Expected 2 uploaded rows, got: ($ok_run.stdout | str trim)"
+    assert (($ok_log | str contains "Batch 1/1: 2 paths, ~0 KB argv, exit 0, uploaded 2, skipped 0, failed 0")) $"Expected the batch outcome line, got: ($ok_log)"
+
+    let fail_run = (run-publish-script $fail_fixture "always-fail" $script)
+    let fail_log = ($fail_run.stderr | ansi strip)
+
+    assert ($fail_run.exit_code == 1) $"Expected exit 1, got ($fail_run.exit_code): ($fail_log | str trim)"
+    assert (($fail_log | str contains "Batch 1/1: 2 paths, ~0 KB argv, exit 1, uploaded 0, skipped 0, failed 2")) $"Expected the failed batch outcome line, got: ($fail_log)"
+    assert (($fail_log | str contains "error: HTTP 413 payload too large")) $"Expected the stderr tail, got: ($fail_log)"
+  } finally {
+    rm -rf $ok_fixture.dir
+    rm -rf $fail_fixture.dir
+  }
+}
+
+# Test: dry-run returns no rows and spawns no push
+export def --env "test ci nix publish dry-run" [] {
   mimic reset
 
   mimic register nix {
-    args: ['build' '.#myapp' '--json' '--no-link']
-    returns: ""
+    args: ['path-info' '--recursive' '/nix/store/app']
+    returns: "/nix/store/app\n/nix/store/dep1"
   }
 
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/app']
+    returns: "unknown-deriver"
+  }
+
+  let result = ([{path: "/nix/store/app" status: "success"}] | ci nix publish mycache --dry-run)
+
+  assert (($result | length) == 0) $"Expected no rows on dry-run but got: ($result)"
+  assert ((mimic get-calls cachix | length) == 0) "Expected no cachix push on dry-run"
+}
+
+# Test: failed build rows carry no path and push nothing
+export def --env "test ci nix publish ignores failed build rows" [] {
+  mimic reset
+
+  let result = (
+    [{flake: "." package: "app" system: "x86_64-linux" path: null status: "failed" error: "build failed"}]
+    | ci nix publish mycache
+  )
+
+  assert (($result | length) == 0) $"Expected no rows but got: ($result)"
+  assert ((mimic get-calls cachix | length) == 0) "Expected no push for failed build rows"
+}
+
+# Test: the aggregate "Nothing to push" line marks the whole batch skipped
+export def --env "test ci nix publish all skipped" [] {
+  mimic reset
+
   mimic register nix {
-    args: ['path-info' '--recursive' '.#myapp']
+    args: ['path-info' '--recursive' '/nix/store/a']
     returns: "/nix/store/a\n/nix/store/b\n/nix/store/c"
   }
 
-  # all three in upstream
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/a']
-    returns: "/nix/store/a"
-  }
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/b']
-    returns: "/nix/store/b"
-  }
-  mimic register nix {
-    args: ['path-info' '--store' 'https://cache.nixos.org' '/nix/store/c']
-    returns: "/nix/store/c"
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/a']
+    returns: "unknown-deriver"
   }
 
-  let result = (ci nix publish mycache --flake '.#myapp')
+  # The cachix.org URL must reduce to the cache name
+  mimic register cachix {
+    args: ['push' 'ck3mp3r' '/nix/store/a' '/nix/store/b' '/nix/store/c']
+    returns: "Nothing to push - all store paths are already on Cachix.\nAll done."
+    exit_code: 0
+  }
 
-  assert ($result.status == "success") $"Expected success"
-  assert ($result.pushed_count == 0) $"Expected 0 pushed"
-  assert ($result.skipped_count == 3) $"Expected 3 skipped"
+  let result = ([{path: "/nix/store/a" status: "success"}] | ci nix publish 'https://ck3mp3r.cachix.org')
+
+  assert (($result | length) == 3) $"Expected 3 rows but got: ($result)"
+  assert (($result | where status == "skipped" | length) == 3) $"Expected all rows skipped: got ($result)"
+
+  mimic verify
+}
+
+# Test: a store URI pushes with nix copy and reports the complement as skipped
+export def --env "test ci nix publish store uri" [] {
+  mimic reset
+
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/a']
+    returns: "/nix/store/a\n/nix/store/b"
+  }
+
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/a']
+    returns: "unknown-deriver"
+  }
+
+  mimic register nix {
+    args: ['copy' '--to' 's3://bucket' '/nix/store/a' '/nix/store/b']
+    returns: ""
+    exit_code: 0
+  }
+
+  let result = ([{path: "/nix/store/a" status: "success"}] | ci nix publish 's3://bucket')
+
+  assert (($result | length) == 2) $"Expected 2 rows but got: ($result)"
+  assert (($result | where status == "skipped" | length) == 2) $"Expected all rows skipped: got ($result)"
 
   mimic verify
 }

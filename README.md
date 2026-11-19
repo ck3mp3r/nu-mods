@@ -136,9 +136,9 @@ Nix operations (pipeline-friendly).
 - `ci nix build` - Build packages (all or specific)
 - `ci nix closure` - Get recursive dependencies of store paths
 - `ci nix cache` - Check cache status or push store paths to a binary cache
-- `ci nix publish` - Build a flake, get its closure, check upstream and cachix caches, and push missing paths
-  - Flags: `--flake` (default `.`), `--upstream` (default `https://cache.nixos.org`)
-  - Usage: `ci nix publish mycache --flake ".#myapp"`
+- `ci nix publish` - Push the closure of build rows to a binary cache as honest per-path rows
+  - Flags: `--dry-run` (report the batch plan and push nothing)
+  - Usage: `$results | ci nix publish "https://ck3mp3r.cachix.org"`
 - `ci nix missing-paths` - Filter cache-status records to paths missing from all caches
   - Usage: `[{path: "..." in_upstream: false in_cachix: false}] | ci nix missing-paths mycache`
 
@@ -242,7 +242,7 @@ ci nix build
 ci nix build mypackage --impure
 ci nix build | where status == "success" | get path | ci nix cache --cache cachix
 ["." "../backend"] | ci nix build | ci nix cache --cache s3://bucket
-ci nix publish mycache --flake ".#myapp"
+$results | ci nix publish "https://ck3mp3r.cachix.org"
 
 # Cargo version bump
 ci cargo update-version "0.2.0"
