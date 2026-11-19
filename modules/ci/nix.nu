@@ -500,91 +500,207 @@ export def "ci nix cache" [
   }
 }
 
-# Publish a flake output to a binary cache: build, get closure, check caches, push missing
+# Publish the closures of build rows to a binary cache: rows in, honest rows out
 export def "ci nix publish" [
-  cache: string # Cache name or URI to push to
-  --flake: string = "." # Flake target to build (e.g., ".#myapp")
-  --upstream: string = "https://cache.nixos.org" # Upstream cache to check against
+  cache: string # Target cache: cachix name, https://<name>.cachix.org, or a store URI
+  --dry-run # Report the batch plan without spawning cachix or nix copy
 ]: [
-  nothing -> record
+  list<record> -> list<record>
 ] {
-  $"Publishing ($flake) to ($cache)" | ci log info
+  let build_rows = $in
+  let paths = (
+    $build_rows
+    | each {|row| $row | get -o path }
+    | compact
+    | where {|path| $path | is-not-empty }
+  )
 
-  # Build the flake
-  $"Building ($flake)" | ci log info
-  try {
-    nix build $flake --json --no-link
-  } catch {|err|
-    $"Failed to build ($flake): ($err.msg)" | ci log error
-    return {status: "error" error: $"Failed to build ($flake): ($err.msg)" cache: $cache flake: $flake total_paths: 0 pushed_count: 0 skipped_count: 0}
+  if ($paths | is-empty) {
+    "No store paths in the input rows, nothing to publish" | ci log info
+    return []
   }
 
-  # Get the closure (all recursive dependencies)
-  $"Getting closure for ($flake)" | ci log info
-  let paths = (
+  # ci nix closure is the only nix query publish makes, and it drains to files
+  let pushable = (
+    $paths
+    | ci nix closure
+    | where {|path| not ($path | str ends-with '.drv') }
+    | uniq
+    | sort
+  )
+
+  if ($pushable | is-empty) {
+    "The closure holds no pushable paths, nothing to publish" | ci log info
+    return []
+  }
+
+  let batches = (batch-plan $pushable (200 * 1024))
+  let bytes = ($pushable | each {|path| ($path | str length) + 1 } | math sum)
+
+  if $dry_run {
+    $"Dry-run: would push ($pushable | length) paths, ~($bytes / 1024 | math round) KB, ($batches | length) batches to ($cache)" | ci log info
+    return []
+  }
+
+  let result = (push-batches $cache $pushable)
+  let failed = ($result.rows | where status == "failed")
+
+  if ($failed | is-empty) {
+    let uploaded = ($result.rows | where status == "uploaded" | length)
+    $"Pushed ($uploaded) of ($result.rows | length) paths to ($cache)" | ci log info
+  } else {
+    for row in $failed {
+      $"Failed to push ($row.path): ($row.error)" | ci log error | ignore
+    }
+
+    # A command cannot return rows and set an exit code: failing the command is the gate
+    error make {
+      msg: $"Publish to ($cache) failed: ($failed | length) of ($result.rows | length) paths. First: ($failed.0.path): ($failed.0.error)"
+    }
+  }
+
+  $result.rows
+}
+
+# Split paths into batches that keep the argv under the byte budget
+def batch-plan [paths: list<string>, budget: int] {
+  mut batches = []
+  mut current = []
+  mut size = 0
+
+  for path in $paths {
+    let cost = (($path | str length) + 1)
+
+    if (($size + $cost) > $budget) and ($current | is-not-empty) {
+      $batches = ($batches | append [$current])
+      $current = []
+      $size = 0
+    }
+
+    $current = ($current | append $path)
+    $size = $size + $cost
+  }
+
+  if ($current | is-not-empty) {
+    $batches = ($batches | append [$current])
+  }
+
+  $batches
+}
+
+# Read a drained stream file back as non-empty lines
+def drain-lines [log_file: string] {
+  if ($log_file | path exists) {
+    open --raw $log_file | lines | where {|line| $line | str trim | is-not-empty }
+  } else {
+    []
+  }
+}
+
+# A store URI is pushed with nix copy; every other target is a cachix cache
+def is-store-uri [cache: string] {
+  ($cache !~ '^https?://.*\.cachix\.org') and ($cache =~ '^[a-z][a-z0-9+.-]*://')
+}
+
+# Reduce a cachix URL to the cache name the CLI expects
+def cachix-name [cache: string] {
+  if ($cache =~ '^https?://.*\.cachix\.org') {
+    $cache | parse 'https://{name}.cachix.org' | get name.0
+  } else {
+    $cache
+  }
+}
+
+# Error text for a failed batch: the caught message plus the drained stream tail
+def push-error-tail [failure: any, lines: list<string>] {
+  let tail = ($lines | last 5 | str join " | ")
+
+  if ($failure | is-not-empty) and ($tail | is-not-empty) {
+    $"($failure): ($tail)"
+  } else if ($failure | is-not-empty) {
+    $failure
+  } else if ($tail | is-not-empty) {
+    $tail
+  } else {
+    "push failed without output"
+  }
+}
+
+# Run one push invocation and parse the drained streams into an uploaded set
+def push-batch [cache: string, batch: list<string>] {
+  let out_log = (mktemp)
+  let err_log = (mktemp)
+
+  # Both streams drain to files: piping push output into nu capture deadlocks
+  let failure = (
     try {
-      nix path-info --recursive $flake | lines | where {|line| ($line | str trim | is-not-empty) }
+      if (is-store-uri $cache) {
+        nix copy --to $cache ...$batch o> $out_log err> $err_log
+      } else {
+        cachix push (cachix-name $cache) ...$batch o> $out_log err> $err_log
+      }
+      null
     } catch {|err|
-      $"Failed to get closure: ($err.msg)" | ci log error
-      return {status: "error" error: $"Failed to get closure: ($err.msg)" cache: $cache flake: $flake total_paths: 0 pushed_count: 0 skipped_count: 0}
+      $err.msg
     }
   )
 
-  let cachix_url = if ($cache =~ '^https?://.*\.cachix\.org') {
-    $cache
-  } else {
-    $"https://($cache).cachix.org"
+  let lines = ((drain-lines $out_log) ++ (drain-lines $err_log))
+  rm -f $out_log $err_log
+
+  let uploaded = ($lines | parse -r '^Pushing (?P<path>\S+)' | get path | uniq)
+
+  {
+    ok: ($failure == null)
+    uploaded: $uploaded
+    error: (push-error-tail $failure $lines)
   }
+}
 
-  # Check each path against upstream and cachix, push if missing from both
-  mut pushed = 0
-  mut skipped = 0
+# Push every path in serial batches with one retry per failed batch
+# Skipped rows are the complement of the uploaded set in a successful batch
+# Failed rows are the complement of the uploaded set after the retry also fails
+def push-batches [cache: string, paths: list<string>] {
+  let pushable = (
+    $paths
+    | where {|path| ($path | is-not-empty) and (not ($path | str ends-with '.drv')) }
+    | uniq
+    | sort
+  )
 
-  for path in $paths {
-    $"Checking cache status for path: ($path)" | ci log info
+  mut rows = []
+  mut ok = true
 
-    # Check upstream cache
-    let in_upstream = (
-      try {
-        nix path-info --store $upstream $path
-        true
-      } catch {
-        false
+  for batch in (batch-plan $pushable (200 * 1024)) {
+    mut pushed = (push-batch $cache $batch)
+
+    if not $pushed.ok {
+      $"Batch of ($batch | length) paths failed, retrying once" | ci log warning
+      $pushed = (push-batch $cache $batch)
+    }
+
+    if not $pushed.ok {
+      $ok = false
+    }
+
+    # A closure cannot read a mutable binding, so publish the batch from an immutable copy
+    let push = $pushed
+    let batch_rows = (
+      $batch | each {|path|
+        if $path in $push.uploaded {
+          {path: $path status: "uploaded" error: null}
+        } else if $push.ok {
+          {path: $path status: "skipped" error: null}
+        } else {
+          {path: $path status: "failed" error: $push.error}
+        }
       }
     )
 
-    # Check cachix cache (if not already in upstream)
-    let in_cachix = if $in_upstream {
-      true
-    } else {
-      try {
-        nix path-info --store $cachix_url $path
-        true
-      } catch {
-        false
-      }
-    }
-
-    if $in_upstream or $in_cachix {
-      $"Skipping ($path) - already cached" | ci log info
-      $skipped = ($skipped + 1)
-    } else {
-      $"Pushing ($path) to cachix" | ci log info
-      let cache_name = if ($cache =~ '^https?://.*\.cachix\.org') {
-        ($cache | parse 'https://{name}.cachix.org' | get name.0)
-      } else {
-        $cache
-      }
-      try {
-        cachix push $cache_name $path
-        $pushed = ($pushed + 1)
-      } catch {|err|
-        $"Failed to push ($path): ($err.msg)" | ci log error
-      }
-    }
+    $rows = ($rows | append $batch_rows)
   }
 
-  {status: "success" error: null cache: $cache flake: $flake total_paths: ($paths | length) pushed_count: $pushed skipped_count: $skipped}
+  {rows: $rows ok: $ok}
 }
 
 # Filter records to paths missing from all caches and write a markdown summary
