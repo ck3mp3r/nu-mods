@@ -245,12 +245,8 @@ Get the full closure (all dependencies) of Nix store paths.
 # Build and get full closure (for pushing to cache)
 ci nix build myapp | where status == "success" | get path | ci nix closure
 
-# Build, get closure, and push everything to cache
-ci nix build 
-  | where status == "success" 
-  | get path 
-  | ci nix closure 
-  | ci nix cache cachix
+# Build and publish the closures of the successful builds
+ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
 ```
 
 **Use Cases:**
@@ -260,90 +256,81 @@ ci nix build
 
 ---
 
-### `ci nix cache`
+### `ci nix publish`
 
-Check upstream cache status and/or push store paths to binary cache.
+Push the closures of build rows to a binary cache and return one honest row per path.
 
 **Input:**
-- `list<string>` - List of Nix store paths (required)
+- `list<record>` - `ci nix build` rows (`{flake, package, system, path, status, error}`); rows with `path: null` are ignored
 
 **Arguments:**
-- `cache` - Target cache URI to push to (required, e.g., `cachix`, `s3://bucket`)
+- `cache` - Target cache (required): a cachix name, `https://<name>.cachix.org`, or a store URI (pushed with `nix copy --to`)
 
 **Flags:**
-- `--upstream <uri>` - Upstream cache URI to check if paths are already cached
-- `--dry-run` - Skip pushing (only check upstream if provided)
+- `--dry-run` - Log the batch plan and push nothing (returns an empty row list)
 
 **Output Table:**
 ```
-┌────────────────────┬────────┬─────────────────────────┬──────────┬─────────┬───────┐
-│ path               │ cached │ upstream                │ cache    │ status  │ error │
-├────────────────────┼────────┼─────────────────────────┼──────────┼─────────┼───────┤
-│ /nix/store/abc-... │ false  │ https://cache.nixos.org │ cachix   │ success │ null  │
-└────────────────────┴────────┴─────────────────────────┴──────────┴─────────┴───────┘
+┌────────────────────┬──────────┬───────┐
+│ path               │ status   │ error │
+├────────────────────┼──────────┼───────┤
+│ /nix/store/abc-... │ uploaded │ null  │
+│ /nix/store/def-... │ skipped  │ null  │
+└────────────────────┴──────────┴───────┘
 ```
 
 **Fields:**
-- `cached` - `true` if path found in upstream, `false` if not, `null` if no upstream checked
-- `upstream` - Upstream cache URI if `--upstream` provided, else `null`
-- `cache` - Target cache URI if pushed, else `null`
+- `status` - `uploaded` (parsed from cachix's per-path output), `skipped` (the rest of a successful batch - cachix skips server side), or `failed` (the rest of a batch that failed twice)
+- `error` - Failure text from the failed batch, `null` otherwise
+
+**Contract:** the command exits `0` iff no row is `failed` after the batch retry, and `1` otherwise, so it gates CI directly. Paths are deduped, derivations (`.drv`) dropped and sorted; pushes run in serial batches under a ~200 KB argv budget. Every batch logs its outcome: index/total, path count, argv size, exit code and the uploaded/skipped/failed counts.
 
 **Cache URI Formats:**
-- Cachix: `cachix` (uses default cachix config)
+- Cachix: `cachix` (default cachix config) or `https://<name>.cachix.org`
 - S3: `s3://bucket-name`
 - File: `file:///path/to/cache`
 - HTTP: `https://cache.example.com`
 
 **Examples:**
 ```nu
-# Push specific paths
-["/nix/store/abc-pkg" "/nix/store/def-pkg"] | ci nix cache cachix
+# Build rows in, honest rows out
+let results = (ci nix build)
+$results | ci nix publish "https://ck3mp3r.cachix.org"
 
-# Check if paths exist in upstream cache (dry-run)
-ci nix build | get path | ci nix cache https://cache.nixos.org --upstream https://cache.nixos.org --dry-run
+# Count what actually uploaded
+$results | ci nix publish "https://ck3mp3r.cachix.org" | where status == "uploaded" | length
 
-# Check upstream and push only if not cached
-ci nix build 
-  | get path 
-  | ci nix cache cachix --upstream https://cache.nixos.org
-  | where cached == false
+# Inspect failures
+$results | ci nix publish "https://ck3mp3r.cachix.org" | where status == "failed"
 
-# Pipeline: build and push successful builds
-ci nix build | where status == "success" | get path | ci nix cache cachix
+# Push to a store URI instead
+$results | ci nix publish "s3://mybucket"
 
-# Push to S3
-ci nix build myapp | get path | ci nix cache s3://mybucket
-
-# Check push results
-ci nix build | get path | ci nix cache cachix | where status == "failed"
+# Plan only: no cachix or nix copy process is spawned
+$results | ci nix publish "https://ck3mp3r.cachix.org" --dry-run
 ```
 
 ## Pipeline Patterns
 
-### Build → Filter → Push
+### Build → Publish
 
 ```nu
-# Build all, push only successful builds
-ci nix build 
-  | where status == "success" 
-  | get path 
-  | ci nix cache cachix
+# Build all, publish the closures of the successful builds
+ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
 
-# Build, get full closure, and push everything
+# Count uploaded vs skipped
 ci nix build
-  | where status == "success"
-  | get path
-  | ci nix closure
-  | ci nix cache cachix
+  | ci nix publish "https://ck3mp3r.cachix.org"
+  | where status == "uploaded"
+  | length
 
-# Build specific packages, push to multiple caches
+# Build specific packages, publish to two caches
 ci nix build web api
-  | where status == "success"
-  | get path
-  | ci nix closure
-  | tee { ci nix cache cachix }
-  | ci nix cache s3://backup
+  | tee { ci nix publish "https://ck3mp3r.cachix.org" }
+  | ci nix publish "s3://backup"
 ```
+
+A failed push fails the command (exit 1), so the pipeline gates CI without an extra check.
 
 ### Multi-Flake Operations
 
@@ -383,9 +370,7 @@ def deploy-all [] {
     | where status == "success"
     | get flake
     | ci nix build
-    | where status == "success"
-    | get path
-    | ci nix cache cachix
+    | ci nix publish "https://ck3mp3r.cachix.org"
 }
 
 # Conditional build based on package discovery
@@ -488,18 +473,14 @@ This prevents unexpected lock file changes that can occur with:
    ci nix check | get flake | ci nix build
    ```
 
-2. **Filter early, act on success:**
+2. **Publish only what built:**
    ```nu
-   ci nix build | where status == "success" | get path | ci nix cache cachix
+   ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
    ```
 
-3. **Push complete closures to cache:**
+3. **Gate CI on the push:**
    ```nu
-   ci nix build 
-     | where status == "success" 
-     | get path 
-     | ci nix closure 
-     | ci nix cache cachix
+   ci nix build | ci nix publish "https://ck3mp3r.cachix.org" | where status == "uploaded" | length
    ```
 
 4. **Operate on multiple flakes at once:**

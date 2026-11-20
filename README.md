@@ -135,12 +135,9 @@ Nix operations (pipeline-friendly).
 - `ci nix packages` - List packages from flakes
 - `ci nix build` - Build packages (all or specific)
 - `ci nix closure` - Get recursive dependencies of store paths
-- `ci nix cache` - Check cache status or push store paths to a binary cache
 - `ci nix publish` - Push the closure of build rows to a binary cache as honest per-path rows
   - Flags: `--dry-run` (report the batch plan and push nothing)
   - Usage: `$results | ci nix publish "https://ck3mp3r.cachix.org"`
-- `ci nix missing-paths` - Filter cache-status records to paths missing from all caches
-  - Usage: `[{path: "..." in_upstream: false in_cachix: false}] | ci nix missing-paths mycache`
 
 #### ci cargo
 Cargo operations.
@@ -179,7 +176,7 @@ Enhanced logging.
 - Flow types: `--feature`, `--fix`, `--hotfix`, `--release`, `--chore`
 - Complete GitHub PR and workflow management
 - GitHub release creation with auto-generated changelogs
-- Nix flake build/cache/publish pipeline
+- Nix flake build/publish pipeline
 - Cargo version bumping with `cargo check`
 - Homebrew formula updates with per-arch sha256 hashes
 - Per-arch artifact platform data generation
@@ -240,8 +237,6 @@ ci nix update nixpkgs
 ci nix packages
 ci nix build
 ci nix build mypackage --impure
-ci nix build | where status == "success" | get path | ci nix cache --cache cachix
-["." "../backend"] | ci nix build | ci nix cache --cache s3://bucket
 $results | ci nix publish "https://ck3mp3r.cachix.org"
 
 # Cargo version bump
