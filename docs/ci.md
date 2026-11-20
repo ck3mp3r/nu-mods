@@ -41,7 +41,7 @@ Pipeline-friendly flake and cache management.
 **Quick Example:**
 ```nu
 # Pipeline composition
-ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
 
 # Multi-flake operations
 ["." "../backend"] | ci nix check | ci nix update | ci nix build
@@ -59,8 +59,8 @@ ci nix build | where status == "success" | get path | ci nix cache --cache cachi
 ci nix check
 let build_results = (ci nix build)
 
-# 3. Push successful builds to cache
-$build_results | where status == "success" | get path | ci nix cache --cache s3://mybucket
+# 3. Publish the closures of the successful builds
+$build_results | ci nix publish "s3://mybucket"
 
 # 4. Create PR
 ci github pr create "feat: add authentication" "Implements user auth" --target main
@@ -96,8 +96,8 @@ ci scm branch "v2.1.0" --release --from develop
 # 2. Update dependencies
 ci nix update
 
-# 3. Build all packages and push to cache
-ci nix build | where status == "success" | get path | ci nix cache --cache s3://releases
+# 3. Build all packages and publish the closures
+ci nix build | ci nix publish "s3://releases"
 
 # 5. Create release PR
 ci github pr create "release: v2.1.0" "Release notes..." --target main
@@ -124,23 +124,21 @@ ci github pr create "release: v2.1.0" "Release notes..." --target main
 ```nu
 # Create branch and build in one flow
 "TICKET-123" | ci scm branch "new feature" --feature
-ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
 ci github pr create "feat: new feature" "Description"
 ```
 
-### Update → Check → Build → Push
+### Update → Check → Build → Publish
 
 ```nu
-# Update, verify, build, and push - all in pipeline
+# Update, verify, build, and publish - all in pipeline
 ci nix update 
   | get flake 
   | ci nix check 
   | where status == "success"
   | get flake
   | ci nix build
-  | where status == "success"
-  | get path
-  | ci nix cache --cache cachix
+  | ci nix publish "https://ck3mp3r.cachix.org"
 ```
 
 ### List → View → Logs
@@ -164,9 +162,9 @@ ci github workflow logs 12345
    "PROJ-123" | ci scm branch "description" --feature
    ```
 
-3. **Use pipelines for build → push:**
+3. **Use pipelines for build → publish:**
    ```nu
-   ci nix build | where status == "success" | get path | ci nix cache --cache cachix
+   ci nix build | ci nix publish "https://ck3mp3r.cachix.org"
    ```
 
 4. **Monitor workflows after PR:**

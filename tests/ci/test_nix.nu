@@ -1,5 +1,5 @@
 # Test ci/nix.nu with pipeline-oriented API
-# Focus: Test flake operations with stdin/table outputs and cache management
+# Focus: Test flake operations with stdin/table outputs and binary cache publishing
 
 use std/assert
 use ../../modules/nu-mimic *
@@ -321,167 +321,8 @@ export def --env "test ci nix closure reads multi-line build closure" [] {
   mimic verify
 }
 
-# ============================================================================
-# CACHE TESTS
-# ============================================================================
-
-# Test: Push single path to cache (one batched invocation)
-export def --env "test ci nix cache push single path" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/abc-pkg']
-    returns: ""
-    exit_code: 0
-  }
-
-  let result = (['/nix/store/abc-pkg'] | ci nix cache cachix)
-
-  assert (($result | length) == 1) $"Expected 1 result but got: ($result | length)"
-  assert ($result.0.status == "success") $"Expected success but got: ($result.0.status)"
-  assert ($result.0.cache == "cachix") $"Expected cachix cache but got: ($result.0.cache)"
-  assert ($result.0.cached == false) $"Expected cached false but got: ($result.0.cached)"
-
-  mimic verify
-}
-
-# Test: Push multiple paths in ONE cachix invocation (argv = full batch)
-export def --env "test ci nix cache push multiple paths" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/abc' '/nix/store/def']
-    returns: ""
-    exit_code: 0
-  }
-
-  let result = (['/nix/store/abc' '/nix/store/def'] | ci nix cache cachix)
-
-  assert (($result | length) == 2) $"Expected 2 results but got: ($result | length)"
-  assert ($result.0.status == "success") $"Expected success for path 0"
-  assert ($result.1.status == "success") $"Expected success for path 1"
-
-  mimic verify
-}
-
-# Test: cachix.org URL is reduced to the cache name, batch passed once
-export def --env "test ci nix cache cachix url batch" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'ck3mp3r' '/nix/store/aaa' '/nix/store/bbb' '/nix/store/ccc']
-    returns: ""
-    exit_code: 0
-  }
-
-  let result = (['/nix/store/aaa' '/nix/store/bbb' '/nix/store/ccc'] | ci nix cache 'https://ck3mp3r.cachix.org')
-
-  assert (($result | length) == 3) $"Expected 3 results but got: ($result | length)"
-  assert (($result | where status == "success" | length) == 3) $"Expected all rows success: got ($result)"
-
-  mimic verify
-}
-
-# Test: derivations are filtered out of the push set
-export def --env "test ci nix cache filters derivations" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/abc-pkg' '/nix/store/dep1']
-    returns: ""
-    exit_code: 0
-  }
-
-  let input = [
-    "/nix/store/abc-pkg"
-    "/nix/store/abc-pkg.drv"
-    "/nix/store/dep1"
-    "/nix/store/dep1.drv"
-  ]
-  let result = ($input | ci nix cache cachix)
-
-  assert (($result | length) == 2) $"Expected 2 results after .drv filter but got: ($result | length)"
-  assert (($result | where {|row| $row.path | str ends-with '.drv'} | length) == 0) $"Expected no .drv rows: got ($result)"
-
-  mimic verify
-}
-
-# Test: non-cachix store URI uses one batched nix copy
-export def --env "test ci nix cache store uri batch" [] {
-  mimic reset
-
-  mimic register nix {
-    args: ['copy' '--to' 's3://bucket' '/nix/store/abc' '/nix/store/def']
-    returns: ""
-    exit_code: 0
-  }
-
-  let result = (['/nix/store/abc' '/nix/store/def'] | ci nix cache 's3://bucket')
-
-  assert (($result | length) == 2) $"Expected 2 results but got: ($result | length)"
-  assert (($result | where status == "success" | length) == 2) $"Expected all rows success: got ($result)"
-
-  mimic verify
-}
-
-# Test: --upstream is accepted and ignored; one batch push happens
-export def --env "test ci nix cache ignores upstream flag" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/abc-pkg']
-    returns: ""
-    exit_code: 0
-  }
-
-  let result = (['/nix/store/abc-pkg'] | ci nix cache cachix --upstream 'https://cache.nixos.org')
-
-  assert (($result | length) == 1) $"Expected 1 result but got: ($result | length)"
-  assert ($result.0.status == "success") $"Expected success but got: ($result.0.status)"
-  assert ($result.0.cached == false) $"Expected cached false but got: ($result.0.cached)"
-  assert ($result.0.upstream == "https://cache.nixos.org") $"Expected upstream retained but got: ($result.0.upstream)"
-
-  mimic verify
-}
-
-# Test: dry-run spawns no cachix process and returns dry-run rows
-export def --env "test ci nix cache dry-run status" [] {
-  mimic reset
-
-  # No mocks registered: any cachix/nix spawn fails the mimic lookup and
-  # would surface as an error row instead of dry-run rows
-  let result = (['/nix/store/abc-pkg' '/nix/store/abc-pkg.drv'] | ci nix cache cachix --dry-run)
-
-  assert (($result | length) == 1) $"Expected 1 result after .drv filter but got: ($result | length)"
-  assert ($result.0.status == "dry-run") $"Expected dry-run status but got: ($result.0.status)"
-  assert ($result.0.cached == null) $"Expected cached null but got: ($result.0.cached)"
-  assert ($result.0.path == "/nix/store/abc-pkg") $"Expected the non-drv path but got: ($result.0.path)"
-
-  mimic verify
-}
-
-# Test: batched push failure returns exactly one error row
-export def --env "test ci nix cache batch failure returns error row" [] {
-  mimic reset
-
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/bad1' '/nix/store/bad2']
-    returns: "upload failed"
-    exit_code: 1
-  }
-
-  let result = (['/nix/store/bad1' '/nix/store/bad2'] | ci nix cache cachix)
-
-  assert (($result | length) == 1) $"Expected exactly 1 row but got: ($result | length)"
-  assert ($result.0.path == "batch") $"Expected batch path but got: ($result.0.path)"
-  assert ($result.0.status == "error") $"Expected error status but got: ($result.0.status)"
-  assert ($result.0.error =~ "upload failed") $"Expected the failure message but got: ($result.0.error)"
-
-  mimic verify
-}
-
-# Test: Pipeline - build and push to cache
-export def --env "test ci nix build and push pipeline" [] {
+# Test: Pipeline - build rows feed the publisher
+export def --env "test ci nix build and publish pipeline" [] {
   mimic reset
 
   mimic register nix {
@@ -494,16 +335,27 @@ export def --env "test ci nix build and push pipeline" [] {
     returns: "/nix/store/abc-pkg1"
   }
 
-  mimic register cachix {
-    args: ['push' 'cachix' '/nix/store/abc-pkg1']
-    returns: ""
+  mimic register nix {
+    args: ['path-info' '--recursive' '/nix/store/abc-pkg1']
+    returns: "/nix/store/abc-pkg1"
   }
 
-  let result = (ci nix build pkg1 | where status == 'success' | get path | ci nix cache cachix)
+  mimic register nix-store {
+    args: ['--query' '--deriver' '/nix/store/abc-pkg1']
+    returns: "unknown-deriver"
+  }
 
-  assert (($result | length) == 1) $"Expected 1 push result"
-  assert ($result.0.path == "/nix/store/abc-pkg1") $"Expected correct path"
-  assert ($result.0.status == "success") $"Expected success but got: ($result.0.status)"
+  mimic register cachix {
+    args: ['push' 'cachix' '/nix/store/abc-pkg1']
+    returns: "Pushing /nix/store/abc-pkg1 (1 KiB)"
+    exit_code: 0
+  }
+
+  let result = (ci nix build pkg1 | ci nix publish cachix)
+
+  assert (($result | length) == 1) $"Expected 1 publish row but got: ($result)"
+  assert ($result.0.path == "/nix/store/abc-pkg1") $"Expected correct path: got ($result)"
+  assert ($result.0.status == "uploaded") $"Expected uploaded status but got: ($result.0.status)"
 
   mimic verify
 }
@@ -920,59 +772,6 @@ export def --env "test ci nix publish store uri" [] {
   assert (($result | where status == "skipped" | length) == 2) $"Expected all rows skipped: got ($result)"
 
   mimic verify
-}
-
-# ============================================================================
-# MISSING-PATHS TESTS
-# ============================================================================
-
-# Test: missing-paths filters to not cached
-export def "test ci nix missing-paths filter" [] {
-  let records = [
-    {path: "/nix/store/abc" in_upstream: true in_cachix: false}
-    {path: "/nix/store/def" in_upstream: false in_cachix: false}
-  ]
-
-  let result = ($records | ci nix missing-paths mycache)
-
-  assert (($result | length) == 1) $"Expected 1 missing"
-  assert ($result.0 == "/nix/store/def") $"Expected /nix/store/def"
-}
-
-# Test: missing-paths all cached returns empty
-export def "test ci nix missing-paths all cached" [] {
-  let records = [
-    {path: "/nix/store/abc" in_upstream: true in_cachix: false}
-  ]
-
-  let result = ($records | ci nix missing-paths mycache)
-
-  assert (($result | length) == 0) $"Expected empty result"
-}
-
-# Test: missing-paths writes summary to GITHUB_STEP_SUMMARY
-export def "test ci nix missing-paths summary" [] {
-  let test_file = $"/tmp/nu_nix_summary_(random chars).md"
-
-  with-env {
-    GITHUB_STEP_SUMMARY: $test_file
-  } {
-    try {
-      let records = [
-        {path: "/nix/store/abc" in_upstream: true in_cachix: false}
-        {path: "/nix/store/def" in_upstream: false in_cachix: false}
-      ]
-
-      let result = ($records | ci nix missing-paths mycache)
-
-      let summary = (open --raw $test_file)
-
-      assert ($summary =~ "Cache|Count") $"Expected markdown table with cache header"
-      assert (($result | length) == 1) $"Expected 1 missing"
-    } finally {
-      rm -f $test_file
-    }
-  }
 }
 
 # Test 26: Filter flakes - empty list
